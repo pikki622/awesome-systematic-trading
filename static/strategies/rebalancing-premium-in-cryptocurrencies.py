@@ -55,9 +55,9 @@ class RebalancingPremiumInCryptocurrencies(QCAlgorithm):
         self.prev_short_portfolio_equity = 0    # short leg equity tracking
 
     def OnData(self, data):
-        if not (self.Time.hour == 9 and self.Time.minute == 30):
+        if self.Time.hour != 9 or self.Time.minute != 30:
             return
-        
+
         all_cryptos_are_ready = True       # data warmup flag
 
         # check if all cryptos has ready data
@@ -69,14 +69,14 @@ class RebalancingPremiumInCryptocurrencies(QCAlgorithm):
             else:
                 all_cryptos_are_ready = False
                 break
-        
+
         if all_cryptos_are_ready or self.was_traded_already:
             self.was_traded_already = True
-            
+
             # long strategy equity calculation
             long_portfolio_equity = self.Portfolio.TotalPortfolioValue
             long_equity_to_trade = long_portfolio_equity / len(self.cryptos)
-            
+
             # short strategy equity calculation
             short_portfolio_equity = self.Portfolio.TotalPortfolioValue * self.short_side_percentage
             short_equity_to_trade = short_portfolio_equity / len(self.cryptos)
@@ -93,23 +93,24 @@ class RebalancingPremiumInCryptocurrencies(QCAlgorithm):
                     # long strategy
                     long_q = np.floor(long_equity_to_trade / symbol_obj.last_price)
                     # currency was traded before
-                    if symbol_obj.quantity is not None:
-                        # calculate quantity difference
-                        diff_q = long_q - symbol_obj.quantity
-                    
-                        # rebalance position
-                        if abs(diff_q) >= self.Securities[crypto].SymbolProperties.MinimumOrderSize:
-                            self.MarketOrder(crypto, diff_q)
-                            
-                            # change new quantity
-                            symbol_obj.quantity += diff_q
-                    else:
+                    if symbol_obj.quantity is None:
                         # rebalance position
                         if abs(long_q) >= self.Securities[crypto].SymbolProperties.MinimumOrderSize:
                             self.MarketOrder(crypto, long_q)
-                        
+
                             # change new quantity
                             symbol_obj.quantity = long_q
+
+                    else:
+                        # calculate quantity difference
+                        diff_q = long_q - symbol_obj.quantity
+
+                        # rebalance position
+                        if abs(diff_q) >= self.Securities[crypto].SymbolProperties.MinimumOrderSize:
+                            self.MarketOrder(crypto, diff_q)
+
+                            # change new quantity
+                            symbol_obj.quantity += diff_q
     
 class SymbolData():
     def __init__(self):

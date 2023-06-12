@@ -28,7 +28,7 @@ class OptionExpirationWeekEffect(QCAlgorithm):
     def Rebalance(self):
         calendar = self.TradingCalendar.GetDaysByType(TradingDayType.OptionExpiration, self.Time, self.EndDate)
         expiries = [i.Date for i in calendar]
-        if len(expiries) == 0: return
+        if not expiries: return
 
         self.near_expiry = expiries[0]
 

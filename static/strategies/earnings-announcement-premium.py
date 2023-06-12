@@ -78,33 +78,37 @@ class EarningsAnnouncementPremium(QCAlgorithm):
         return [x for x in selected if self.data[x].IsReady]
 
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and \
-                    ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                    
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
         #     top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
         # else:
         #     top_by_market_cap = fine
-        
+
         top_by_market_cap = fine
-            
+
         fine_symbols = [x.Symbol for x in top_by_market_cap]
-            
+
         # Ratio/market cap pair.
         volume_concentration_ratio = {}
         for stock in top_by_market_cap:
             symbol = stock.Symbol
-            
+
             if symbol not in self.monthly_volume:
                 self.monthly_volume[symbol] = deque(maxlen = self.month_period)
 
-            monthly_vol = sum([x for x in self.data[symbol]])
+            monthly_vol = sum(list(self.data[symbol]))
             last_month_date = self.Time - timedelta(days = self.Time.day)
             last_file_date = stock.EarningReports.FileDate # stock annoucement day
             was_announcement_month = (last_file_date.year == last_month_date.year and last_file_date.month == last_month_date.month)    # Last month was announcement date.
             self.monthly_volume[symbol].append(VolumeData(last_month_date, monthly_vol, was_announcement_month))
-            
+
             # 48 months of volume data is ready.
             if len(self.monthly_volume[symbol]) == self.monthly_volume[symbol].maxlen:
                 # Volume concentration ratio calc.
@@ -113,26 +117,26 @@ class EarningsAnnouncementPremium(QCAlgorithm):
 
                 if len(announcement_volumes) == announcement_count:
                     announcement_months_volume = sum(announcement_volumes)
-                    total_volume = sum([x.Volume for x in self.monthly_volume[symbol]])
-                    
+                    total_volume = sum(x.Volume for x in self.monthly_volume[symbol])
+
                     if announcement_months_volume != 0 and total_volume != 0:
                         # Store ratio, market cap pair.
                         volume_concentration_ratio[stock] = announcement_months_volume / total_volume
-        
+
         # Volume sorting.
         sorted_by_volume = sorted(volume_concentration_ratio.items(), key = lambda x: x[1], reverse = True)
-        quintile = int(len(sorted_by_volume) / 5)
+        quintile = len(sorted_by_volume) // 5
         high_volume = [x[0] for x in sorted_by_volume[:quintile]]
-            
+
         # Filering announcers and non-announcers.
         month_to_lookup = self.Time.month
         year_to_lookup = self.Time.year - 1
-            
+
         long = []
         short = []
         for stock in high_volume:
             symbol = stock.Symbol
-            
+
             announcement_dates = [[x.Date.year, x.Date.month] for x in self.monthly_volume[symbol] if x.WasAnnouncementMonth]
             if [year_to_lookup, month_to_lookup] in announcement_dates:
                 long.append(stock)
@@ -146,13 +150,13 @@ class EarningsAnnouncementPremium(QCAlgorithm):
                 symbols_to_remove.append(symbol)
         for symbol in symbols_to_remove:
             del self.monthly_volume[symbol]
-            
+
         # Market cap weighting.
-        total_market_cap_long = sum([x.MarketCap for x in long])
+        total_market_cap_long = sum(x.MarketCap for x in long)
         for stock in long:
             self.weight[symbol] = stock.MarketCap  / total_market_cap_long
-        
-        total_market_cap_short = sum([x.MarketCap for x in short])
+
+        total_market_cap_short = sum(x.MarketCap for x in short)
         for stock in short:
             self.weight[symbol] = -stock.MarketCap  / total_market_cap_short
 

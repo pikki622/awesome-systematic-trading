@@ -53,11 +53,9 @@ class EarningsQualityFactor(QCAlgorithm):
         if not self.selection_flag:
             return Universe.Unchanged
 
-        selected = [
+        return [
             x.Symbol for x in coarse if x.HasFundamentalData and x.Market == "usa"
         ]
-
-        return selected
 
     def FineSelectionFunction(self, fine):
         fine = [
@@ -65,20 +63,19 @@ class EarningsQualityFactor(QCAlgorithm):
             for x in fine
             if x.MarketCap != 0
             and x.CompanyReference.IndustryTemplateCode != "B"
-            and (
-                (x.SecurityReference.ExchangeId == "NYS")
-                or (x.SecurityReference.ExchangeId == "NAS")
-                or (x.SecurityReference.ExchangeId == "ASE")
-            )
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
             and x.FinancialStatements.BalanceSheet.CurrentAssets.Value != 0
-            and x.FinancialStatements.BalanceSheet.CashAndCashEquivalents.Value != 0
+            and x.FinancialStatements.BalanceSheet.CashAndCashEquivalents.Value
+            != 0
             and x.FinancialStatements.BalanceSheet.CurrentLiabilities.Value != 0
             and x.FinancialStatements.BalanceSheet.CurrentDebt.Value != 0
             and x.FinancialStatements.IncomeStatement.DepreciationAndAmortization.Value
             != 0
             and x.FinancialStatements.BalanceSheet.GrossPPE.Value != 0
-            and x.FinancialStatements.IncomeStatement.TotalRevenueAsReported.Value != 0
-            and x.FinancialStatements.CashFlowStatement.OperatingCashFlow.Value != 0
+            and x.FinancialStatements.IncomeStatement.TotalRevenueAsReported.Value
+            != 0
+            and x.FinancialStatements.CashFlowStatement.OperatingCashFlow.Value
+            != 0
             and x.EarningReports.BasicEPS.Value != 0
             and x.EarningReports.BasicAverageShares.Value != 0
             and x.OperationRatios.DebttoAssets.Value != 0
@@ -87,7 +84,7 @@ class EarningsQualityFactor(QCAlgorithm):
 
         if len(fine) > self.coarse_count:
             sorted_by_market_cap = sorted(fine, key=lambda x: x.MarketCap, reverse=True)
-            top_by_market_cap = [x for x in sorted_by_market_cap[: self.coarse_count]]
+            top_by_market_cap = list(sorted_by_market_cap[: self.coarse_count])
         else:
             top_by_market_cap = fine
 
@@ -177,7 +174,7 @@ class EarningsQualityFactor(QCAlgorithm):
             score[obj[0]] = score_accruals + score_CFA + score_DA + score_ROE
 
         sorted_by_score = sorted(score.items(), key=lambda x: x[1], reverse=True)
-        tercile = int(len(sorted_by_score) / 3)
+        tercile = len(sorted_by_score) // 3
         long = [x[0] for x in sorted_by_score[:tercile]]
         short = [x[0] for x in sorted_by_score[-tercile:]]
 
@@ -222,10 +219,9 @@ class EarningsQualityFactor(QCAlgorithm):
         dep = current_accrual_data.DepreciationAndAmortization
         total_assets_prev_year = prev_accrual_data.TotalAssets
 
-        acc = (
+        return (
             delta_assets - delta_liabilities - delta_cash + delta_debt - dep
         ) / total_assets_prev_year
-        return acc
 
     def Selection(self):
         if self.Time.month == 7:
@@ -266,8 +262,7 @@ class StockData:
 def MultipleLinearRegression(x, y):
     x = np.array(x).T
     x = sm.add_constant(x)
-    result = sm.OLS(endog=y, exog=x).fit()
-    return result
+    return sm.OLS(endog=y, exog=x).fit()
 
 
 # Custom fee model

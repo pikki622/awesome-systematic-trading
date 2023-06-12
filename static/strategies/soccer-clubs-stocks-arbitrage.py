@@ -51,17 +51,18 @@ class SoccerClubsStocksArbitrage(QCAlgorithm):
         
     def OnData(self, data):
         self.Liquidate()
-        
+
         short = []
-        
+
         # Looking for todays date, because only daily closes are traded.
         today = (self.Time - timedelta(days=1)).date()
-        
+
         if today in self.match_dates:
-            for ticker in self.tickers:
-                if ticker in self.match_dates[today] and ticker in data:
-                    short.append(ticker)
-                    
+            short.extend(
+                ticker
+                for ticker in self.tickers
+                if ticker in self.match_dates[today] and ticker in data
+            )
         for ticker in short:
             self.SetHoldings(ticker, -1 / len(short))
 

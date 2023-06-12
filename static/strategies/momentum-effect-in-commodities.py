@@ -73,7 +73,7 @@ class MomentumEffectCommodities(QCAlgorithm):
         short = []
         if len(perf) >= 5:
             sorted_by_performance = sorted(perf.items(), key = lambda x:x[1], reverse=True)
-            quintile = int(len(sorted_by_performance) / 5)
+            quintile = len(sorted_by_performance) // 5
             long = [x[0] for x in sorted_by_performance[:quintile]]
             short = [x[0] for x in sorted_by_performance[-quintile:]]
 
@@ -82,7 +82,7 @@ class MomentumEffectCommodities(QCAlgorithm):
         for symbol in invested:
             if symbol not in long + short:
                 self.Liquidate(symbol)
-                
+
         for symbol in long:
             self.SetHoldings(symbol, 1 / len(long))
         for symbol in short:

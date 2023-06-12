@@ -87,13 +87,11 @@ class ShortTermReversal(QCAlgorithm):
         near_contract: FuturesContract = None
 
         if symbol in futures_chain:
-            contracts: list = [
+            if contracts := [
                 contract
                 for contract in futures_chain[symbol]
                 if contract.Expiry.date() > self.Time.date()
-            ]
-
-            if len(contracts) >= 1:
+            ]:
                 contracts: list = sorted(
                     contracts, key=lambda x: x.Expiry, reverse=False
                 )
@@ -141,16 +139,16 @@ class ShortTermReversal(QCAlgorithm):
                         self.recent_month = self.Time.month
                         rebalance_flag = True
 
-                    if rebalance_flag:
-                        if (
+                    if (
                             len(self.data[futures_info.quantpedia_future])
                             == self.data[futures_info.quantpedia_future].maxlen
                         ):
+                        if rebalance_flag:
                             # performance
                             prices: list[float] = [
                                 x[0] for x in self.data[futures_info.quantpedia_future]
                             ]
-                            half: list[float] = int(len(prices) / 2)
+                            half: list[float] = len(prices) // 2
                             prices: list[float] = prices[-half:]
                             ret: float = prices[-1] / prices[0] - 1
 
@@ -173,8 +171,7 @@ class ShortTermReversal(QCAlgorithm):
                             t1_oi: list[int] = interests[-half:]
                             t1_oi_total: float = sum(t1_oi)
                             t2_oi: list[int] = interests[:half]
-                            t2_oi_total: float = sum(t2_oi)
-                            oi_weekly_diff: float = t1_oi_total - t2_oi_total
+                            oi_weekly_diff: float = t1_oi_total - sum(t2_oi)
 
                             # store weekly diff data
                             ret_volume_oi_data[futures_info.quantpedia_future] = (
@@ -190,20 +187,20 @@ class ShortTermReversal(QCAlgorithm):
                 volume_sorted: list = sorted(
                     ret_volume_oi_data.items(), key=lambda x: x[1][1], reverse=True
                 )
-                half: int = int(len(volume_sorted) / 2)
-                high_volume: list = [x for x in volume_sorted[:half]]
+                half: int = len(volume_sorted) // 2
+                high_volume: list = list(volume_sorted[:half])
 
                 open_interest_sorted: list = sorted(
                     ret_volume_oi_data.items(), key=lambda x: x[1][2], reverse=True
                 )
-                half = int(len(open_interest_sorted) / 2)
-                low_oi: list = [x for x in open_interest_sorted[-half:]]
+                half = len(open_interest_sorted) // 2
+                low_oi: list = list(open_interest_sorted[-half:])
 
                 filtered: list = [x for x in high_volume if x in low_oi]
                 filtered_by_return: list = sorted(
                     filtered, key=lambda x: x[0], reverse=True
                 )
-                half = int(len(filtered_by_return) / 2)
+                half = len(filtered_by_return) // 2
 
                 long: list[Symbol] = filtered_by_return[-half:]
                 short: list[Symbol] = filtered_by_return[:half]
@@ -216,7 +213,7 @@ class ShortTermReversal(QCAlgorithm):
                     for symbol, ret_volume_oi in long + short:
                         diff[symbol] = ret_volume_oi[0] - avg_ret
 
-                    total_diff: float = sum([abs(x[1]) for x in diff.items()])
+                    total_diff: float = sum(abs(x[1]) for x in diff.items())
                     long_symbols: list[Symbol] = [x[0] for x in long]
 
                     if total_diff != 0:

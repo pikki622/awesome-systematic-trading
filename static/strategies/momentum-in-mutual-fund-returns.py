@@ -59,34 +59,34 @@ class MomentuminMutualFundReturns(QCAlgorithm):
         # Rebalance quarterly
         if self.recent_month % 3 != 0:
             return
-            
+
         performance = {}
-        
+
         for symbol in self.symbols:
             # If data for etf are ready calculate it's 6 month performance
             if self.data[symbol].IsReady:
                 if self.Securities[symbol].GetLastData() and (self.Time.date() - self.Securities[symbol].GetLastData().Time.date()).days <= 3:
-                    prices = [x for x in self.data[symbol]]
+                    prices = list(self.data[symbol])
                     performance[symbol] = (prices[0] - prices[-1]) / prices[-1]
-                
+
         if len(performance) < self.quantile:
             self.Liquidate()
             return
-        
+
         decile = int(len(performance) / self.quantile)
         # sort dictionary by performance and based on it create sorted list
         sorted_by_perf = [x[0] for x in sorted(performance.items(), key=lambda item: item[1], reverse=True)]
         # select top decile etfs for investment based on performance
         long = sorted_by_perf[:decile]
-        
+
         # Trade execution
         invested_etfs = [x.Key for x in self.Portfolio if x.Value.Invested]
         for symbol in invested_etfs:
             if symbol not in long:
                 self.Liquidate(symbol)
-            
+
         long_length = len(long)
-        
+
         for symbol in long:
             self.SetHoldings(symbol, 1 / long_length)    
 

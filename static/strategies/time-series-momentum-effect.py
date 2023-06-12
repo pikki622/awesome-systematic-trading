@@ -132,7 +132,7 @@ class TimeSeriesMomentum(QCAlgorithm):
                     ).days
                     < 5
                 ):
-                    back_adjusted_prices = np.array([x for x in self.data[symbol]])
+                    back_adjusted_prices = np.array(list(self.data[symbol]))
                     performance = back_adjusted_prices[0] / back_adjusted_prices[-1] - 1
                     daily_rets = (
                         back_adjusted_prices[:-1] / back_adjusted_prices[1:] - 1
@@ -149,7 +149,7 @@ class TimeSeriesMomentum(QCAlgorithm):
 
                     performance_volatility[symbol] = (performance, volatility_3M)
 
-        if len(performance_volatility) == 0:
+        if not performance_volatility:
             return
 
         # Performance sorting.
@@ -162,7 +162,7 @@ class TimeSeriesMomentum(QCAlgorithm):
         ls_leverage = []  # long and short leverage
 
         for sym_i, symbols in enumerate([long, short]):
-            total_volatility = sum([1 / performance_volatility[x][1] for x in symbols])
+            total_volatility = sum(1 / performance_volatility[x][1] for x in symbols)
 
             # Inverse volatility weighting.
             weights = np.array(
@@ -172,12 +172,9 @@ class TimeSeriesMomentum(QCAlgorithm):
             weights = weights / weights_sum
 
             df = pd.DataFrame()
-            i = 0
-            for symbol in symbols:
-                df[str(symbol)] = [x for x in daily_returns[symbol]]
+            for i, symbol in enumerate(symbols):
+                df[str(symbol)] = list(daily_returns[symbol])
                 weight_by_symbol[symbol] = weights[i] if sym_i == 0 else -weights[i]
-                i += 1
-
             # volatility targeting
             portfolio_vol = np.sqrt(
                 np.dot(weights.T, np.dot(df.cov() * 252, weights.T))

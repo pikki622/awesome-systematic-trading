@@ -110,17 +110,21 @@ class MomentumFactorAssetGrowthEffect(QCAlgorithm):
         return [x for x in selected if self.data[x].is_ready()]   
 
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths > 0 and 
-                ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
+        fine = [
+            x
+            for x in fine
+            if x.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths > 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
 
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
         #     top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
         # else:
         #     top_by_market_cap = fine
-        
+
         top_by_market_cap = fine
-        
+
         # Asset growth calc.
         asset_growth = {}
         for stock in top_by_market_cap:
@@ -128,19 +132,19 @@ class MomentumFactorAssetGrowthEffect(QCAlgorithm):
 
             if self.data[symbol].asset_data_is_ready():
                 asset_growth[symbol] = self.data[symbol].asset_growth()
-                
+
             self.data[symbol].update_assets(stock.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths)
-        
+
         sorted_by_growth = sorted(asset_growth.items(), key = lambda x: x[1], reverse = True)
-        decile = int(len(sorted_by_growth) / 10)
+        decile = len(sorted_by_growth) // 10
         top_by_growth = [x[0] for x in sorted_by_growth][:decile]
-        
+
         performance = { x : self.data[x].performance(1) for x in top_by_growth}
         sorted_by_performance = sorted(performance.items(), key = lambda x: x[1], reverse = True)
-        quintile = int(len(sorted_by_performance) / 5)
+        quintile = len(sorted_by_performance) // 5
         self.long = [x[0] for x in sorted_by_performance][:quintile]
         self.short = [x[0] for x in sorted_by_performance][-quintile:]
-        
+
         return self.long + self.short
 
     def OnData(self, data):
@@ -185,7 +189,7 @@ class SymbolData():
         return self.TotalAssets.IsReady
     
     def asset_growth(self) -> float:
-        asset_values = [x for x in self.TotalAssets]
+        asset_values = list(self.TotalAssets)
         return (asset_values[0] - asset_values[1]) / asset_values[1]
     
     def is_ready(self) -> bool:
@@ -193,7 +197,7 @@ class SymbolData():
         
     # Performance, one month skipped.
     def performance(self, values_to_skip = 0) -> float:
-        closes = [x for x in self.Price][values_to_skip:]
+        closes = list(self.Price)[values_to_skip:]
         return (closes[0] / closes[-1] - 1)
         
 # Custom fee model.

@@ -82,7 +82,7 @@ class PairsTradingwithCountryETFs(QCAlgorithm):
             if symbol_obj in data and data[symbol_obj]:
                 price = data[symbol_obj].Value
                 self.history_price[symbol].Add(price)
-                        
+
         # Start of trading period.
         if self.days == 20:
             # minimize the sum of squared deviations
@@ -90,59 +90,61 @@ class PairsTradingwithCountryETFs(QCAlgorithm):
             for pair in self.symbol_pairs:
                 if self.history_price[pair[0]].IsReady and self.history_price[pair[1]].IsReady:
                     if (self.Time.date() - self.Securities[pair[0]].GetLastData().Time.date()).days <= 3 and (self.Time.date() - self.Securities[pair[1]].GetLastData().Time.date()).days <= 3:
-                        distances[pair] = self.Distance([x for x in self.history_price[pair[0]]], [x for x in self.history_price[pair[1]]])
-            
-            if len(distances) != 0:
+                        distances[pair] = self.Distance(
+                            list(self.history_price[pair[0]]),
+                            list(self.history_price[pair[1]]),
+                        )
+
+            if distances:
                 self.sorted_pairs = sorted(distances.items(), key = lambda x: x[1])[:self.max_traded_pairs]
                 self.sorted_pairs = [x[0] for x in self.sorted_pairs]
-            
+
             self.Liquidate()
             self.traded_pairs.clear()
             self.traded_quantity.clear()
-            
+
             self.days = 0
-        
+
         self.days += 1
-        
+
         if self.sorted_pairs is None: return
-    
+
         pairs_to_remove = []
-    
+
         for pair in self.sorted_pairs:
             # Calculate the spread of two price series.
-            price_a = [x for x in self.history_price[pair[0]]]
-            price_b = [x for x in self.history_price[pair[1]]]
+            price_a = list(self.history_price[pair[0]])
+            price_b = list(self.history_price[pair[1]])
             norm_a = np.array(price_a) / price_a[-1]
             norm_b = np.array(price_b) / price_b[-1]
-            
+
             spread = norm_a - norm_b
             mean = np.mean(spread)
             std = np.std(spread)
             actual_spread = spread[0]
-            
-            # Long-short position is opened when pair prices have diverged by two standard deviations.
-            traded_portfolio_value = self.Portfolio.TotalPortfolioValue / self.max_traded_pairs
+
             if actual_spread > mean + 0.5*std or actual_spread < mean - 0.5*std:
                 if pair not in self.traded_pairs:
+                    # Long-short position is opened when pair prices have diverged by two standard deviations.
+                    traded_portfolio_value = self.Portfolio.TotalPortfolioValue / self.max_traded_pairs
                     # open new position for pair, if there's place for it.
                     if len(self.traded_pairs) < self.max_traded_pairs:
-                        symbol_a = pair[0]
                         symbol_b = pair[1]
                         a_price_norm = norm_a[0]
                         b_price_norm = norm_b[0]
                         a_price = price_a[0]
                         b_price = price_b[0]
-                            
+                        symbol_a = pair[0]
                         # a etf's price > b etf's price
                         if a_price_norm > b_price_norm:
                             long_q = traded_portfolio_value / b_price    # long b etf
                             short_q = -traded_portfolio_value / a_price  # short a etf
                             if self.Securities.ContainsKey(symbol_a) and self.Securities.ContainsKey(symbol_b) and \
-                                self.Securities[symbol_a].Price != 0 and self.Securities[symbol_a].IsTradable and \
-                                self.Securities[symbol_b].Price != 0 and self.Securities[symbol_b].IsTradable:
+                                    self.Securities[symbol_a].Price != 0 and self.Securities[symbol_a].IsTradable and \
+                                    self.Securities[symbol_b].Price != 0 and self.Securities[symbol_b].IsTradable:
                                 self.MarketOrder(symbol_a, short_q)
                                 self.MarketOrder(symbol_b, long_q)
-                                
+
                                 self.traded_quantity[pair] = (short_q, long_q)
                                 self.traded_pairs.append(pair)
                         # b etf's price > a etf's price
@@ -150,21 +152,19 @@ class PairsTradingwithCountryETFs(QCAlgorithm):
                             long_q = traded_portfolio_value / a_price    # long a etf
                             short_q = -traded_portfolio_value / b_price  # short b etf
                             if self.Securities.ContainsKey(symbol_a) and self.Securities.ContainsKey(symbol_b) and \
-                                self.Securities[symbol_a].Price != 0 and self.Securities[symbol_a].IsTradable and \
-                                self.Securities[symbol_b].Price != 0 and self.Securities[symbol_b].IsTradable:
+                                    self.Securities[symbol_a].Price != 0 and self.Securities[symbol_a].IsTradable and \
+                                    self.Securities[symbol_b].Price != 0 and self.Securities[symbol_b].IsTradable:
                                 self.MarketOrder(symbol_a, long_q)
                                 self.MarketOrder(symbol_b, short_q)
-                                
+
                                 self.traded_quantity[pair] = (long_q, short_q)
                                 self.traded_pairs.append(pair)
-            # The position is closed when prices revert back.
-            else:
-                if pair in self.traded_pairs and pair in self.traded_quantity:
-                    # make opposite order to opened position
-                    self.MarketOrder(pair[0], -self.traded_quantity[pair][0])
-                    self.MarketOrder(pair[1], -self.traded_quantity[pair][1])
-                    pairs_to_remove.append(pair)
-            
+            elif pair in self.traded_pairs and pair in self.traded_quantity:
+                # make opposite order to opened position
+                self.MarketOrder(pair[0], -self.traded_quantity[pair][0])
+                self.MarketOrder(pair[1], -self.traded_quantity[pair][1])
+                pairs_to_remove.append(pair)
+
         for pair in pairs_to_remove:
             self.traded_pairs.remove(pair)
             del self.traded_quantity[pair]

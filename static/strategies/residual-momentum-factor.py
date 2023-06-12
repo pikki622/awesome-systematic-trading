@@ -80,32 +80,30 @@ class ResidualMomentumFactor(QCAlgorithm):
         # Update the rolling window every month.
         for stock in coarse:
             symbol = stock.Symbol
-            
+
             # Store monthly market price.
             if symbol == self.symbol:
                 self.data[self.symbol].Add(stock.AdjustedPrice)
-            else:
-                # Store monthly stock price.
-                if symbol in self.data:
-                    self.data[symbol].Add(stock.AdjustedPrice)
+            elif symbol in self.data:
+                self.data[symbol].Add(stock.AdjustedPrice)
 
         selected = [x.Symbol for x in coarse if x.HasFundamentalData and x.Market == 'usa']
         # selected = [x.Symbol
         #     for x in sorted([x for x in coarse if x.HasFundamentalData and x.Market == 'usa'],
         #         key = lambda x: x.DollarVolume, reverse = True)[:self.coarse_count]]
-        
+
         # Warmup price rolling windows.
         for symbol in selected:
             if symbol in self.data:
                 continue
-            
+
             self.data[symbol] = RollingWindow[float](self.period)
             history = self.History(symbol, self.period * 21, Resolution.Daily)
             if history.empty:
                 self.Log(f"Not enough data for {symbol} yet.")
                 continue
             closes = history.loc[symbol].close
-            
+
             closes_len = len(closes.keys())
             # Find monthly closes.
             for index, time_close in enumerate(closes.iteritems()):
@@ -113,17 +111,22 @@ class ResidualMomentumFactor(QCAlgorithm):
                 if index + 1 < closes_len:
                     date_month = time_close[0].date().month
                     next_date_month = closes.keys()[index + 1].month
-                
+
                     # Found last day of month.
                     if date_month != next_date_month:
                         self.data[symbol].Add(time_close[1])
-            
+
         return [x for x in selected if self.data[x].IsReady]        
 
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and x.CompanyReference.IsREIT == 0 and      \
-                ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.CompanyReference.IsREIT == 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         if len(fine) > self.coarse_count:
             sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
             top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
@@ -132,7 +135,7 @@ class ResidualMomentumFactor(QCAlgorithm):
 
         # Size factor.
         # sorted_by_market_cap = sorted(top_by_market_cap, key = lambda x:(x.MarketCap), reverse=False)
-        quintile = int(len(top_by_market_cap) / 5)
+        quintile = len(top_by_market_cap) // 5
         size_factor_long = [ (i.Symbol,True) for i in top_by_market_cap[-quintile:]]
         size_factor_short = [(i.Symbol,False) for i in top_by_market_cap[:quintile]]
         # Calculate last month's performance.
@@ -142,10 +145,10 @@ class ResidualMomentumFactor(QCAlgorithm):
                 self.size_factor_vector.Add(monthly_return)
         # Store new factor symbols.
         self.size_factor_symbols = size_factor_long + size_factor_short
-                
+
         # Value factor.
         sorted_by_pb = sorted(top_by_market_cap, key = lambda x:(x.ValuationRatios.PBRatio), reverse=False)
-        quintile = int(len(sorted_by_pb) / 5)
+        quintile = len(sorted_by_pb) // 5
         value_factor_long = [(i.Symbol,True) for i in sorted_by_pb[:quintile]]
         value_factor_short = [(i.Symbol,False) for i in sorted_by_pb[-quintile:]]
         # Calculate last month's performance.
@@ -155,48 +158,48 @@ class ResidualMomentumFactor(QCAlgorithm):
                 self.value_factor_vector.Add(monthly_return)
         # Store new factor symbols.
         self.value_factor_symbols = value_factor_long + value_factor_short
-            
+
         # Every factor vector is ready.
         if self.size_factor_vector.IsReady and self.value_factor_vector.IsReady:
             
             # Market factor.
             market_factor = []
             if self.symbol in self.data and self.data[self.symbol].IsReady:
-                market_factor_prices = np.array([x for x in self.data[self.symbol]])
+                market_factor_prices = np.array(list(self.data[self.symbol]))
                 market_factor = (market_factor_prices[:-1] - market_factor_prices[1:]) / market_factor_prices[1:]
-            
+
                 if len(market_factor) == (self.period - 1): 
                     # Residual return calc.
                     x = [
-                        [x for x in market_factor], 
-                        [x for x in self.size_factor_vector], 
-                        [x for x in self.value_factor_vector]
+                        list(market_factor),
+                        list(self.size_factor_vector),
+                        list(self.value_factor_vector),
                     ]
-                    
+
                     standardized_residual_momentum = {}
                     for stock in top_by_market_cap:
                         symbol = stock.Symbol
                         if symbol in self.data and self.data[symbol].IsReady:
-                            monthly_prices = np.array([x for x in self.data[symbol]])
+                            monthly_prices = np.array(list(self.data[symbol]))
                             monthly_returns = (monthly_prices[:-1] - monthly_prices[1:]) / monthly_prices[1:]
-                            
+
                             regression_model = self.MultipleLinearRegression(x, monthly_returns)
                             alpha = regression_model.params[0]
-                            
+
                             if symbol not in self.residual_return:
                                 self.residual_return[symbol] = RollingWindow[float](self.residual_momentum_period)
                             self.residual_return[symbol].Add(alpha)
-                            
+
                             # Residual data for 12 months is ready.
                             if self.residual_return[symbol].IsReady:
-                                residual_returns = [x for x in self.residual_return[symbol]]
+                                residual_returns = list(self.residual_return[symbol])
                                 standardized_residual_momentum[symbol] = sum(residual_returns) / np.std(residual_returns)
-        
+
                     sorted_by_resid_momentum = sorted(standardized_residual_momentum.items(), key = lambda x: x[1], reverse=True)
-                    decile = int(len(sorted_by_resid_momentum) / 10)
+                    decile = len(sorted_by_resid_momentum) // 10
                     self.long = [x[0] for x in sorted_by_resid_momentum[:decile]]
                     self.short = [x[0] for x in sorted_by_resid_momentum[-decile:]]
- 
+
         return self.long + self.short
     
     def OnData(self, data):
@@ -228,7 +231,7 @@ class ResidualMomentumFactor(QCAlgorithm):
         if len(factor_symbols) != 0:
             for symbol, long_flag in factor_symbols:
                 if symbol in data and data[symbol].Count >= 2:
-                    closes = [x for x in data[symbol]]
+                    closes = list(data[symbol])
                     if long_flag:
                         monthly_return += ((closes[0] / closes[1] - 1) / len(factor_symbols))
                     else:
@@ -239,8 +242,7 @@ class ResidualMomentumFactor(QCAlgorithm):
     def MultipleLinearRegression(self, x, y):
         x = np.array(x).T
         x = sm.add_constant(x)
-        result = sm.OLS(endog=y, exog=x).fit()
-        return result
+        return sm.OLS(endog=y, exog=x).fit()
 
 # Custom fee model.
 class CustomFeeModel(FeeModel):

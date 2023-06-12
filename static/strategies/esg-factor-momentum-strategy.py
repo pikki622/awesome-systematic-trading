@@ -68,61 +68,60 @@ class ESGFactorMomentumStrategy(QCAlgorithm):
         fine = [x for x in fine if x.MarketCap != 0]
 
         momentum = {}
-        
+
         # Momentum calc.
         for stock in fine:
             symbol = stock.Symbol
             ticker = symbol.Value
             # ESG data for 14 months is ready.
             if ticker in self.esg and self.esg[ticker].IsReady:
-                esg_data = [x for x in self.esg[ticker]]
-                
+                esg_data = list(self.esg[ticker])
+
                 esg_decile_2_months_ago = esg_data[1]
                 esg_decile_14_months_ago = esg_data[13]
-                
+
                 if esg_decile_14_months_ago != 0 and esg_decile_2_months_ago != 0:
                     # Momentum as difference.
                     # momentum_ = esg_decile_2_months_ago - esg_decile_14_months_ago
-                    
+
                     # Momentum as ratio.
                     momentum_ = (esg_decile_2_months_ago / esg_decile_14_months_ago) - 1
-                    
+
                     # Store momentum/market cap pair.
                     momentum[stock] = momentum_
-                
+
         # Momentum sorting.
         sorted_by_momentum = sorted(momentum.items(), key = lambda x: x[1], reverse = True)
-        decile = int(len(sorted_by_momentum) / 10)
+        decile = len(sorted_by_momentum) // 10
         long = [x[0] for x in sorted_by_momentum[:decile]]
         short = [x[0] for x in sorted_by_momentum[-decile:]]
-        
+
         long_symbol_q = []
         short_symbol_q = []
-        
+
         # ew
         if not self.value_weighting:
-            if len(long) != 0:
+            if long:
                 long_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(long)
                 long_symbol_q = [(x.Symbol, floor(long_w / self.latest_price[x.Symbol])) for x in long]
-            
-            if len(short) != 0:
+
+            if short:
                 short_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(short)
                 short_symbol_q = [(x.Symbol, -floor(short_w / self.latest_price[x.Symbol])) for x in short]
-        # vw
         else:
-            if len(long) != 0:
-                total_market_cap_long = sum([x.MarketCap for x in long])
+            if long:
+                total_market_cap_long = sum(x.MarketCap for x in long)
                 long_w = self.Portfolio.TotalPortfolioValue / self.holding_period
                 long_symbol_q = [(x.Symbol, floor((long_w * (x.MarketCap / total_market_cap_long))) / self.latest_price[x.Symbol]) for x in long]
-            
+
             short_symbol_q = []
-            if len(short) != 0:
-                total_market_cap_short = sum([x.MarketCap for x in short])
+            if short:
+                total_market_cap_short = sum(x.MarketCap for x in short)
                 short_w = self.Portfolio.TotalPortfolioValue / self.holding_period
                 short_symbol_q = [(x.Symbol, -floor((short_w * (x.MarketCap / total_market_cap_short))) / self.latest_price[x.Symbol]) for x in short]
-        
+
         self.managed_queue.append(RebalanceQueueItem(long_symbol_q + short_symbol_q))
-        
+
         return [x.Symbol for x in long + short]
     
     def OnData(self, data):
@@ -201,20 +200,17 @@ class ESGData(PythonData):
     def Reader(self, config, line, date, isLiveMode):
         data = ESGData()
         data.Symbol = config.Symbol
-        
+
         if not line[0].isdigit():
-            self.tickers = [x for x in line.split(';')][1:]
+            self.tickers = list(line.split(';'))[1:]
             return None
-            
+
         split = line.split(';')
-        
+
         data.Time = datetime.strptime(split[0], "%Y-%m-%d") + timedelta(days=1)
 
-        index = 1
-        for ticker in self.tickers:
+        for index, ticker in enumerate(self.tickers, start=1):
             data[ticker] = float(split[index])
-            index += 1
-            
         data.Value = float(split[1])
         return data
         

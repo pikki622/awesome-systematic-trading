@@ -77,58 +77,62 @@ class MomentumReversalCombinedWithVolatilityEffectinStocks(QCAlgorithm):
         return [x.Symbol for x in selected if self.data[x.Symbol].is_ready()]
 
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and \
-                    ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
 
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
         #     top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
         # else:
         #     top_by_market_cap = fine
-            
+
         sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
-        half = int(len(sorted_by_market_cap) / 2)
+        half = len(sorted_by_market_cap) // 2
         top_by_market_cap = [x.Symbol for x in sorted_by_market_cap][:half]
-        
+
         # Performance and volatility tuple.
         perf_volatility = {}
         for symbol in top_by_market_cap:
             performance = self.data[symbol].performance()
             annualized_volatility = self.data[symbol].volatility()
             perf_volatility[symbol] = (performance, annualized_volatility)
-        
+
         long = []
         short = []
         if len(perf_volatility) >= 5:
             sorted_by_perf = sorted(perf_volatility.items(), key = lambda x: x[1][0], reverse = True)
-            quintile = int(len(sorted_by_perf) / 5)
+            quintile = len(sorted_by_perf) // 5
             top_by_perf = [x[0] for x in sorted_by_perf[:quintile]]
             low_by_perf = [x[0] for x in sorted_by_perf[-quintile:]]
-            
+
             sorted_by_vol = sorted(perf_volatility.items(), key = lambda x: x[1][1], reverse = True)
-            quintile = int(len(sorted_by_vol) / 5)
+            quintile = len(sorted_by_vol) // 5
             top_by_vol = [x[0] for x in sorted_by_vol[:quintile]]
             low_by_vol = [x[0] for x in sorted_by_vol[-quintile:]]
-            
+
             long = [x for x in top_by_perf if x in top_by_vol]
             short = [x for x in low_by_perf if x in top_by_vol]
 
-        if len(long) != 0:
+        if long:
             long_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(long)
             # symbol/quantity collection
             long_symbol_q = [(x, np.ceil(long_w / self.data[x].LastPrice)) for x in long]
         else:
             long_symbol_q = []
-    
-        if len(short) != 0:
+
+        if short:
             short_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(short)
             # symbol/quantity collection
             short_symbol_q = [(x, -np.ceil(short_w / self.data[x].LastPrice)) for x in short]
         else:
             short_symbol_q = []
-                
+
         self.managed_queue.append(RebalanceQueueItem(long_symbol_q + short_symbol_q))
-        
+
         return long + short
         
     def OnData(self, data):
@@ -190,12 +194,12 @@ class SymbolData():
         self.Price.Add(close)
         
     def volatility(self):
-        closes = np.array([x for x in self.Price][5:]) # Skip last week.
+        closes = np.array(list(self.Price)[5:])
         daily_returns = closes[:-1] / closes[1:] - 1
         return np.std(daily_returns) * np.sqrt(252 / (len(closes)))
         
     def performance(self):
-        closes = [x for x in self.Price][5:] # Skip last week.
+        closes = list(self.Price)[5:]
         return (closes[0] / closes[-1] - 1)
 
 # Custom fee model.

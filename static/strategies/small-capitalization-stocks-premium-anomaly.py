@@ -36,20 +36,26 @@ class ValueBooktoMarketFactor(QCAlgorithm):
     def CoarseSelectionFunction(self, coarse):
         if not self.selection_flag:
             return Universe.Unchanged
-        
-        selected = [x.Symbol for x in coarse if x.HasFundamentalData and x.Market == 'usa']
-        return selected
+
+        return [x.Symbol for x in coarse if x.HasFundamentalData and x.Market == 'usa']
     
     def FineSelectionFunction(self, fine):
-        sorted_by_market_cap = sorted([x for x in fine if x.MarketCap != 0 and  \
-                                ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))],    \
-                                key = lambda x:x.MarketCap, reverse=True)
-        top_by_market_cap = [x for x in sorted_by_market_cap[:self.coarse_count]]
+        sorted_by_market_cap = sorted(
+            [
+                x
+                for x in fine
+                if x.MarketCap != 0
+                and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+            ],
+            key=lambda x: x.MarketCap,
+            reverse=True,
+        )
+        top_by_market_cap = list(sorted_by_market_cap[:self.coarse_count])
 
-        quintile = int(len(top_by_market_cap) / 5)
+        quintile = len(top_by_market_cap) // 5
         self.long = [i.Symbol for i in top_by_market_cap[-quintile:]]
         self.short = [i.Symbol for i in top_by_market_cap[:quintile]]
-        
+
         return self.long + self.short
     
     def OnData(self, data):

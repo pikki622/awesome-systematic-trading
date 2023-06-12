@@ -15,7 +15,7 @@ from AlgorithmImports import *
 class ValueFactorCAPEEffectwithinCountries(QCAlgorithm):
 
     def Initialize(self):
-        self.SetStartDate(2008, 1, 1)  
+        self.SetStartDate(2008, 1, 1)
         self.SetCash(100000)
 
         self.symbols = {
@@ -39,7 +39,7 @@ class ValueFactorCAPEEffectwithinCountries(QCAlgorithm):
             "Taiwan"        : "EWT",  # iShares MSCI Taiwan Index ETF
             "UK"            : "EWU",  # iShares MSCI United Kingdom Index ETF
             "USA"           : "SPY",  # SPDR S&P 500 ETF
-            
+
             "Russia"        : "ERUS",  # iShares MSCI Russia ETF
             "Israel"        : "EIS",   # iShares MSCI Israel ETF
             "India"         : "INDA",  # iShares MSCI India ETF
@@ -47,16 +47,16 @@ class ValueFactorCAPEEffectwithinCountries(QCAlgorithm):
             "Turkey"        : "TUR"    # iShares MSCI Turkey ETF
         }
 
-        for country, etf_symbol in self.symbols.items():
+        for etf_symbol in self.symbols.values():
             data = self.AddEquity(etf_symbol, Resolution.Daily)
             data.SetFeeModel(CustomFeeModel())
-        
+
         self.quantile:int = 3
         self.max_missing_days:int = 31
 
         # CAPE data import.
         self.cape_data = self.AddData(CAPE, 'CAPE',  Resolution.Daily).Symbol
-            
+
         self.recent_month:int = -1
     
     def OnData(self, data:Slice) -> None:

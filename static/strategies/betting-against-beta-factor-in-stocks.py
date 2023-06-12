@@ -81,60 +81,60 @@ class  BettingAgainstBetaFactorinStocks(QCAlgorithm):
     
     def FineSelectionFunction(self, fine):
         fine = [x for x in fine if x.MarketCap != 0]
-                    
+
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
         #     top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
         # else:
         #     top_by_market_cap = fine
-            
+
         beta = {}
-        
+
         if not self.data[self.symbol].IsReady: return []
-        
+
         for stock in fine:
             symbol = stock.Symbol
-            market_closes = np.array([x for x in self.data[self.symbol]])
-            stock_closes = np.array([x for x in self.data[symbol]])
-              
+            market_closes = np.array(list(self.data[self.symbol]))
+            stock_closes = np.array(list(self.data[symbol]))
+
             market_returns = (market_closes[:-1] - market_closes[1:]) / market_closes[1:]
             stock_returns = (stock_closes[:-1] - stock_closes[1:]) / stock_closes[1:]
-            
+
             cov = np.cov(stock_returns[::-1], market_returns[::-1])[0][1]
             market_variance = np.var(market_returns)
             beta[symbol] = cov / market_variance
-            
-            # beta_, intercept, r_value, p_value, std_err = stats.linregress(market_returns[::-1], stock_returns[::-1])
-            # beta[symbol] = beta_
-        
+                
+                # beta_, intercept, r_value, p_value, std_err = stats.linregress(market_returns[::-1], stock_returns[::-1])
+                # beta[symbol] = beta_
+
         if len(beta) >= 10:
             # sort by beta
             sorted_by_beta = sorted(beta.items(), key = lambda x:x[1], reverse=True)
-            decile = int(len(sorted_by_beta) / 10)
-            self.long = [x for x in sorted_by_beta[-decile:]]
-            self.short = [x for x in sorted_by_beta[:decile]]
-            
+            decile = len(sorted_by_beta) // 10
+            self.long = list(sorted_by_beta[-decile:])
+            self.short = list(sorted_by_beta[:decile])
+
             # create zero-beta portfolio
             long_mean_beta = np.mean([x[1] for x in self.long])
             short_mean_beta = np.mean([x[1] for x in self.short])
-            
+
             self.long = [x[0] for x in self.long]
             self.short = [x[0] for x in self.short]
-            
+
             self.long_lvg = 1/long_mean_beta
             self.short_lvg = 1/short_mean_beta
-            
+
             # cap leverage
             if self.long_lvg <= 0:
                 self.long_lvg = self.leverage_cap
             else:
                 self.long_lvg = min(self.leverage_cap, self.long_lvg)
-                
+
             if self.short_lvg <= 0:
                 self.short_lvg = self.leverage_cap
             else:
                 self.short_lvg = min(self.leverage_cap, self.short_lvg)
-        
+
         return self.long + self.short
         
     def OnData(self, data):

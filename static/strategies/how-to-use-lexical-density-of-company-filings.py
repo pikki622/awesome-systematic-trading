@@ -87,83 +87,89 @@ class BrainLanguageMetrics(QCAlgorithm):
                 symbol = stock.Symbol
                 if symbol in self.recent_universe:
                     self.price[symbol] = stock.AdjustedPrice
-            
+
             return self.recent_universe
-        
+
         if not self.selection_flag:
             return Universe.Unchanged
         self.selection_flag = False
-        
-        if self.universe_size_property == 500 or self.universe_size_property == 1000:
+
+        if self.universe_size_property in [500, 1000]:
             # select top n stocks by dollar volume
-            selected = [x for x in sorted([x for x in coarse if x.HasFundamentalData],
-                    key = lambda x: x.DollarVolume, reverse = True)[:self.coarse_count]]
+            selected = list(
+                sorted(
+                    [x for x in coarse if x.HasFundamentalData],
+                    key=lambda x: x.DollarVolume,
+                    reverse=True,
+                )[: self.coarse_count]
+            )
         elif self.universe_size_property == 3000:
             selected = [x for x in coarse if x.HasFundamentalData]
-            
+
         for stock in selected:
             symbol = stock.Symbol
             self.price[symbol] = stock.AdjustedPrice
-                
+
             if symbol in self.metric:
                 continue
-            
+
             # create RollingWindow for specific stock symbol
             # self.metric[symbol] = RollingWindow[float](self.period)
             self.metric[symbol] = None
-            
+
             # subscribe to Brain Language Metrics data
             dataset_symbol = self.AddData(BrainCompanyFilingLanguageMetrics10K , symbol).Symbol
-            
+
             # warmup Brain Language Metrics data
             history = self.History(dataset_symbol, 3*30, Resolution.Daily)
             # self.Debug(f"We got {len(history)} items from our history request for {dataset_symbol}")
-            
+
             if not history.empty:
-                metrics = []
-                for metric_value in self.metric_values:
-                    m = getattr(history['reportsentiment'].iloc[-1], metric_value)
-                    metrics.append(m)
-                
+                metrics = [
+                    getattr(history['reportsentiment'].iloc[-1], metric_value)
+                    for metric_value in self.metric_values
+                ]
                 # sent = history['reportsentiment'].iloc[-1].Sentiment
                 self.metric[symbol] = (history.iloc[-1].reportdate, metrics[0], metrics[1])#, metrics[2])
-            
+
             # store metric symbol under stock symbol
             self.metric_symbols[symbol] = dataset_symbol
-        
+
         # return stock, which have short interest data ready
         return [x.Symbol for x in selected if x.Symbol in self.metric and x.Symbol in self.price]
         
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0
-                                and ((x.SecurityReference.ExchangeId == "NYS")
-                                or (x.SecurityReference.ExchangeId == "NAS")
-                                or (x.SecurityReference.ExchangeId == "ASE"))]
-        
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         if self.universe_size_property == 3000:
             fine = sorted(fine, key = lambda x:x.MarketCap, reverse=True)[:self.coarse_count]
-        
+
         self.recent_universe = [x.Symbol for x in fine]
-        
+
         metric_cnt = len(self.metric_values)
         for ms_i in range(metric_cnt):
             metric = { stock.Symbol : self.metric[stock.Symbol][ms_i+1] for stock in fine   \
-                    if stock.Symbol in self.metric and  \
-                    self.metric[stock.Symbol] is not None and   \
-                    self.metric[stock.Symbol][ms_i+1] is not None and \
-                    (self.Time - self.metric[stock.Symbol][0]).days <= 30
+                        if stock.Symbol in self.metric and  \
+                        self.metric[stock.Symbol] is not None and   \
+                        self.metric[stock.Symbol][ms_i+1] is not None and \
+                        (self.Time - self.metric[stock.Symbol][0]).days <= 30
             }
-        
+
             if len(metric) < self.portfolio_size_property:
                 continue
-            
+
             # sorting by metric
             sorted_by_metric = sorted(metric.items(), key = lambda x: x[1], reverse=True)
             percentile = int(len(sorted_by_metric) / self.portfolio_size_property)
 
             long = [x[0] for x in sorted_by_metric[:percentile]]
             short = [x[0] for x in sorted_by_metric[-percentile:]]
-            
+
             # calculate quantity for every stock in every portfolio
             long_cnt = len(long)
             short_cnt = len(short)
@@ -177,10 +183,10 @@ class BrainLanguageMetrics(QCAlgorithm):
                 if symbol not in self.traded_quantity:
                     self.traded_quantity[symbol] = 0
                 self.traded_quantity[symbol] += q
-        
+
             # self.short = []
             # self.long = []
-        
+
         return list(self.traded_quantity.keys())
 
     def OnData(self, data):

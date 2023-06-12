@@ -44,24 +44,23 @@ class MomentumFactorAndStyleRotationEffect(QCAlgorithm):
         if self.recent_month == self.Time.month:
             return
         self.recent_month = self.Time.month
-        
-        mom_ready = [ s for s in self.mom if self.mom[s].IsReady and s in data]
-        if mom_ready:
+
+        if mom_ready := [s for s in self.mom if self.mom[s].IsReady and s in data]:
             sorted_mom = sorted(mom_ready, key = lambda x: self.mom[x].Current.Value, reverse=True)
-            
+
             for symbol in sorted_mom[1:-1]:
                 if self.Portfolio[symbol].Invested:
                     self.Liquidate(symbol)
-            
+
             winner = sorted_mom[0]
             loser = sorted_mom[-1]
-            
+
             if self.Securities[winner].Price != 0 and self.Securities[winner].IsTradable:
                 if (self.Time.month == 10 and self.Time.year == 2020) and winner.Value == 'IVW':    # prevent data error
                     self.Liquidate(winner)
                 else:
                     self.SetHoldings(winner, 1)
-            
+
             if self.Securities[loser].Price != 0 and self.Securities[loser].IsTradable:
                 if (self.Time.month == 10 and self.Time.year == 2020) and loser.Value == 'IVW':     # prevent data error
                     self.Liquidate(loser)

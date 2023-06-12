@@ -45,40 +45,44 @@ class AssetGrowthEffect(QCAlgorithm):
         return [x.Symbol for x in coarse if x.HasFundamentalData and x.Market == 'usa']
     
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths > 0 and
-                ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                
+        fine = [
+            x
+            for x in fine
+            if x.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths > 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         if len(fine) > self.coarse_count:
             sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
             fine = sorted_by_market_cap[:self.coarse_count]
-            
+
         assets_growth:dict[Symbol, float] = {}
         for stock in fine:
             symbol = stock.Symbol
-            
+
             if symbol not in self.total_assets:
                 self.total_assets[symbol] = None
-                
+
             current_assets = stock.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths
-            
+
             # There is not previous assets data.
             if not self.total_assets[symbol]:
                 self.total_assets[symbol] = current_assets
                 continue
-            
+
             # Assets growth calc.
             assets_growth[symbol] = (current_assets - self.total_assets[symbol]) / self.total_assets[symbol]
-            
+
             # Update data.
             self.total_assets[symbol] = current_assets
-        
+
         # Asset growth sorting.
         if len(assets_growth) >= self.quantile:
             sorted_by_assets_growth = sorted(assets_growth.items(), key = lambda x: x[1], reverse = True)
             decile = int(len(sorted_by_assets_growth) / self.quantile)
             self.long = [x[0] for x in sorted_by_assets_growth[-decile:]]
             self.short = [x[0] for x in sorted_by_assets_growth[:decile]]
-        
+
         return self.long + self.short
         
     def OnData(self, data):

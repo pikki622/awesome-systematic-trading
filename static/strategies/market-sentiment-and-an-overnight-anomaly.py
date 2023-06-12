@@ -37,16 +37,17 @@ class MarketSentimentAndAnOvernightAnomaly(QCAlgorithm):
     def OnData(self, data: Slice):
         # calculate signal from SPY 16 minutes before close
         if (
-            self.spy_symbol in data
-            and data[self.spy_symbol]
-            and self.Time.hour == 15
-            and self.Time.minute == 44
+            self.spy_symbol not in data
+            or not data[self.spy_symbol]
+            or self.Time.hour != 15
+            or self.Time.minute != 44
         ):
-            weight: float = 0.0
+            return
+        weight: float = 0.0
 
-            for symbol in [self.spy_symbol, self.vix_symbol, self.bms_symbol]:
+        for symbol in [self.spy_symbol, self.vix_symbol, self.bms_symbol]:
                 # trade only sub-strategies with underlying data available
-                if (
+            if (
                     self.Securities[symbol].GetLastData()
                     and (
                         self.Time.date()
@@ -54,38 +55,35 @@ class MarketSentimentAndAnOvernightAnomaly(QCAlgorithm):
                     ).days
                     <= 3
                 ):
-                    price: float = self.Securities[symbol].GetLastData().Price
-                    rolling_window: RollingWindow = self.price_data[symbol]
-                    if rolling_window.IsReady and self.GetSignal(
-                        price,
-                        rolling_window,
-                        True if symbol != self.vix_symbol else False,
-                    ):
-                        weight += 1 / 3
+                price: float = self.Securities[symbol].GetLastData().Price
+                rolling_window: RollingWindow = self.price_data[symbol]
+                if rolling_window.IsReady and self.GetSignal(
+                    price, rolling_window, symbol != self.vix_symbol
+                ):
+                    weight += 1 / 3
 
-                    rolling_window.Add(price)
+                rolling_window.Add(price)
 
-            q: int = int(
-                (self.Portfolio.TotalPortfolioValue * weight)
-                / data[self.spy_symbol].Value
-            )
-            if q != 0:
-                self.MarketOnCloseOrder(self.spy_symbol, q)
-                self.MarketOnOpenOrder(self.spy_symbol, -q)
+        q: int = int(
+            (self.Portfolio.TotalPortfolioValue * weight)
+            / data[self.spy_symbol].Value
+        )
+        if q != 0:
+            self.MarketOnCloseOrder(self.spy_symbol, q)
+            self.MarketOnOpenOrder(self.spy_symbol, -q)
 
     def GetSignal(
         self, curr_value: float, rolling_window: RollingWindow, signal_above_sma: bool
     ) -> bool:
-        prices: list[float] = [x for x in rolling_window]
+        prices: list[float] = list(rolling_window)
         moving_average: float = sum(prices) / len(prices)
 
-        result: bool = False
-        if signal_above_sma and (curr_value > moving_average):
-            result = True
-        elif not signal_above_sma and (curr_value < moving_average):
-            result = True
-
-        return result
+        return (
+            signal_above_sma
+            and curr_value > moving_average
+            or not signal_above_sma
+            and curr_value < moving_average
+        )
 
 
 # Quantpedia data.

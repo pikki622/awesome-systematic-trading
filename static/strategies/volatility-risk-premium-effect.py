@@ -52,9 +52,7 @@ class VolatilityRiskPremiumEffect(QCAlgorithm):
                 strike = min(strikes, key=lambda x: abs(x - underlying_price))
 
                 # determine 15% out-of-the-money strike
-                otm_strike = min(
-                    strikes, key=lambda x: abs(x - float(0.85) * underlying_price)
-                )
+                otm_strike = min(strikes, key=lambda x: abs(x - 0.85 * underlying_price))
 
                 atm_call = [
                     i for i in calls if i.Expiry == expiry and i.Strike == strike
