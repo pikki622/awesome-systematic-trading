@@ -32,24 +32,17 @@ class TradeManager:
         # Open new long trade.
         managed_symbol = ManagedSymbol(symbol, self.holding_period, long_flag)
 
-        if long_flag:
-            # If there's a place for it.
-            if self.long_len < self.long_size:
-                self.symbols.append(managed_symbol)
-                self.algorithm.SetHoldings(symbol, 1 / self.long_size)
-                self.long_len += 1
-            else:
-                self.algorithm.Log("There's not place for additional trade.")
+        if long_flag and self.long_len < self.long_size:
+            self.symbols.append(managed_symbol)
+            self.algorithm.SetHoldings(symbol, 1 / self.long_size)
+            self.long_len += 1
+        elif long_flag or self.short_len >= self.short_size:
+            self.algorithm.Log("There's not place for additional trade.")
 
-        # Open new short trade.
         else:
-            # If there's a place for it.
-            if self.short_len < self.short_size:
-                self.symbols.append(managed_symbol)
-                self.algorithm.SetHoldings(symbol, -1 / self.short_size)
-                self.short_len += 1
-            else:
-                self.algorithm.Log("There's not place for additional trade.")
+            self.symbols.append(managed_symbol)
+            self.algorithm.SetHoldings(symbol, -1 / self.short_size)
+            self.short_len += 1
 
     # Decrement holding period and liquidate symbols.
     def TryLiquidate(self):
@@ -77,7 +70,7 @@ class TradeManager:
             if managed_symbol.symbol.Value == ticker:
                 self.algorithm.Liquidate(managed_symbol.symbol)
                 symbol_to_delete = managed_symbol
-                if managed_symbol.long_flag:
+                if symbol_to_delete.long_flag:
                     self.long_len -= 1
                 else:
                     self.short_len -= 1
@@ -222,7 +215,7 @@ class ReversalDuringEarningsAnnouncements(QCAlgorithm):
                     date_to_lookup in self.earnings_data
                     and symbol.Value in self.earnings_data[date_to_lookup]
                 ):
-                    closes = [x for x in self.data[symbol]]
+                    closes = list(self.data[symbol])
                     # Calculate t-4 to t-2 return.
                     ret = (closes[0] - closes[-1]) / closes[-1]
                     ret_t4_t2[symbol] = ret
@@ -265,7 +258,7 @@ class ReversalDuringEarningsAnnouncements(QCAlgorithm):
         # Every three months.
         if self.month % 3 == 0:
             # Save quarter history.
-            self.ear_previous_quarter = [x for x in self.ear_actual_quarter]
+            self.ear_previous_quarter = list(self.ear_actual_quarter)
             self.ear_actual_quarter.clear()
 
         self.month += 1

@@ -81,9 +81,14 @@ class Month12CycleinCrossSectionofStocksReturns(QCAlgorithm):
         return [x for x in selected if self.data[x].is_ready()]    
         
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and x.CompanyReference.IsREIT != 1 and  \
-                    ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                    
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.CompanyReference.IsREIT != 1
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         if len(fine) > self.coarse_count:
             sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
             top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
@@ -92,23 +97,23 @@ class Month12CycleinCrossSectionofStocksReturns(QCAlgorithm):
 
         # Performance sorting. One month performance, one year ago with market cap data.
         performance_market_cap = { x.Symbol : (self.data[x.Symbol].performance(), x.MarketCap) for x in top_by_market_cap if x.Symbol in self.data and self.data[x.Symbol].is_ready()}
-        
+
         long = []
         short = []
         if len(performance_market_cap) >= 10:
             sorted_by_perf = sorted(performance_market_cap.items(), key = lambda x:x[1][0], reverse = True)
-            decile = int(len(sorted_by_perf) / 10)
-            long = [x for x in sorted_by_perf[:decile]]
-            short = [x for x in sorted_by_perf[-decile:]]
-        
-        total_market_cap_long = sum([x[1][1] for x in long])
+            decile = len(sorted_by_perf) // 10
+            long = list(sorted_by_perf[:decile])
+            short = list(sorted_by_perf[-decile:])
+
+        total_market_cap_long = sum(x[1][1] for x in long)
         for symbol, perf_market_cap in long:
             self.weight[symbol] = perf_market_cap[1] / total_market_cap_long
 
-        total_market_cap_short = sum([x[1][1] for x in short])
+        total_market_cap_short = sum(x[1][1] for x in short)
         for symbol, perf_market_cap in short:
             self.weight[symbol] = perf_market_cap[1] / total_market_cap_short
-        
+
         return [x[0] for x in self.weight.items()]
 
     def OnData(self, data):
@@ -143,7 +148,7 @@ class SymbolData():
         
     # One month performance, one year ago.
     def performance(self):
-        values = [x for x in self.Window]
+        values = list(self.Window)
         return (values[-2] / values[-1] - 1)
         
 # Custom fee model.

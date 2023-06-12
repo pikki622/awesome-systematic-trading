@@ -48,13 +48,15 @@ class AccrualAnomaly(QCAlgorithm):
     def CoarseSelectionFunction(self, coarse):
         if not self.selection_flag:
             return Universe.Unchanged
-        
-        # selected = [x.Symbol for x in coarse if x.HasFundamentalData and x.Market == 'usa']
-        selected = [x.Symbol
-            for x in sorted([x for x in coarse if x.HasFundamentalData and x.Market == 'usa'],
-                key = lambda x: x.DollarVolume, reverse = True)[:self.coarse_count]]
-        
-        return selected
+
+        return [
+            x.Symbol
+            for x in sorted(
+                [x for x in coarse if x.HasFundamentalData and x.Market == 'usa'],
+                key=lambda x: x.DollarVolume,
+                reverse=True,
+            )[: self.coarse_count]
+        ]
     
     def FineSelectionFunction(self, fine):
         fine = [x for x in fine if (float(x.FinancialStatements.BalanceSheet.CurrentAssets.TwelveMonths) != 0) 
@@ -69,37 +71,37 @@ class AccrualAnomaly(QCAlgorithm):
             top_by_market_cap = sorted_by_market_cap[:self.coarse_count]
         else:
             top_by_market_cap = fine
-            
+
         accruals = {}
         for stock in top_by_market_cap:
             symbol = stock.Symbol
-            
+
             if symbol not in self.accrual_data:
                 self.accrual_data[symbol] = None
-                
+
             # Accrual calc.
             current_accruals_data = AccrualsData(stock.FinancialStatements.BalanceSheet.CurrentAssets.TwelveMonths, stock.FinancialStatements.BalanceSheet.CashAndCashEquivalents.TwelveMonths,
                                                 stock.FinancialStatements.BalanceSheet.CurrentLiabilities.TwelveMonths, stock.FinancialStatements.BalanceSheet.CurrentDebt.TwelveMonths, stock.FinancialStatements.BalanceSheet.IncomeTaxPayable.TwelveMonths,
                                                 stock.FinancialStatements.IncomeStatement.DepreciationAndAmortization.TwelveMonths, stock.FinancialStatements.BalanceSheet.TotalAssets.TwelveMonths)
-            
+
             # There is not previous accrual data.
             if not self.accrual_data[symbol]:
                 self.accrual_data[symbol] = current_accruals_data
                 continue
-            
+
             # Accruals and market cap calc.
             acc = self.CalculateAccruals(current_accruals_data, self.accrual_data[symbol])
             accruals[symbol] = acc
-            
+
             # Update accruals data.
             self.accrual_data[symbol] = current_accruals_data
-        
+
         # Accruals sorting.
         sorted_by_accruals = sorted(accruals.items(), key = lambda x: x[1], reverse = True)
-        decile = int(len(sorted_by_accruals) / 10)
+        decile = len(sorted_by_accruals) // 10
         self.long = [x[0] for x in sorted_by_accruals[-decile:]]
         self.short = [x[0] for x in sorted_by_accruals[:decile]]
-        
+
         return self.long + self.short
         
     def OnData(self, data):
@@ -133,9 +135,12 @@ class AccrualAnomaly(QCAlgorithm):
         delta_tax = current_accrual_data.IncomeTaxPayable - prev_accrual_data.IncomeTaxPayable
         dep = current_accrual_data.DepreciationAndAmortization
         avg_total = (current_accrual_data.TotalAssets + prev_accrual_data.TotalAssets) / 2
-        
-        bs_acc = ((delta_assets - delta_cash) - (delta_liabilities - delta_debt - delta_tax) - dep) / avg_total
-        return bs_acc
+
+        return (
+            (delta_assets - delta_cash)
+            - (delta_liabilities - delta_debt - delta_tax)
+            - dep
+        ) / avg_total
 
 class AccrualsData():
     def __init__(self, current_assets, cash_and_cash_equivalents, current_liabilities, current_debt, income_tax_payable, depreciation_and_amortization, total_assets):

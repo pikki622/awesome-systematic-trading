@@ -92,12 +92,12 @@ class CombiningSmartFactorsMomentumandMarketPortfolio(QCAlgorithm):
                 )
                 fast_momentum[symbol] = self.data[symbol][0] / self.data[symbol][1] - 1
 
-        if len(fast_momentum) != 0:
+        if fast_momentum:
             # momentum ranking
             total_weight = {}
 
             # weights
-            rank_sum = sum([x for x in range(1, len(slow_momentum) + 1)])
+            rank_sum = sum(list(range(1, len(slow_momentum) + 1)))
             sorted_by_slow_momentum = sorted(
                 slow_momentum.items(), key=lambda x: abs(x[1]), reverse=False
             )
@@ -137,23 +137,15 @@ class CombiningSmartFactorsMomentumandMarketPortfolio(QCAlgorithm):
             if smart_factors_return != 0:
                 self.monthly_returns["smart_factors"].Add(smart_factors_return)
 
-            score = {}
-            traded_weight = {}
-
             # calculate 12 SMA's
             if (
                 self.monthly_returns["smart_factors"].IsReady
                 and self.monthly_returns["market"].IsReady
             ):
-                score["smart_factors"] = 0
-                score["market"] = 0
+                score = {"smart_factors": 0, "market": 0}
                 for sma_period in range(1, 13):
-                    factor_returns = [x for x in self.monthly_returns["smart_factors"]][
-                        :sma_period
-                    ]
-                    market_returns = [x for x in self.monthly_returns["market"]][
-                        :sma_period
-                    ]
+                    factor_returns = list(self.monthly_returns["smart_factors"])[:sma_period]
+                    market_returns = list(self.monthly_returns["market"])[:sma_period]
 
                     factor_mean_return = np.mean(factor_returns)
                     market_mean_return = np.mean(market_returns)
@@ -165,10 +157,10 @@ class CombiningSmartFactorsMomentumandMarketPortfolio(QCAlgorithm):
 
                 total_score = score["market"] + score["smart_factors"]
                 if total_score != 0:
-                    traded_weight["market"] = score["market"] / total_score
-                    traded_weight["smart_factors"] = (
-                        score["smart_factors"] / total_score
-                    )
+                    traded_weight = {
+                        "market": score["market"] / total_score,
+                        "smart_factors": score["smart_factors"] / total_score,
+                    }
 
                     # order execution
                     # market

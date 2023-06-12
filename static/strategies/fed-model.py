@@ -101,7 +101,7 @@ class FEDModel(QCAlgorithm):
             rf_rates = np.array([x[1] for x in self.market_data][1:])
             excess_returns = market_returns - rf_rates
 
-            yield_gaps = [x for x in self.yield_gap]
+            yield_gaps = list(self.yield_gap)
 
             # linear regression
             # Y = α + (β ∗ X)

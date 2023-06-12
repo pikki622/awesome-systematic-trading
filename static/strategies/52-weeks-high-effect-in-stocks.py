@@ -78,64 +78,75 @@ class Weeks52HighEffectinStocks(QCAlgorithm):
         return [x for x in selected if self.data[x].is_ready()]
 
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and \
-                ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-        
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         group = {}
         for stock in fine:
             symbol = stock.Symbol
-            
+
             industry_group_code = stock.AssetClassification.MorningstarIndustryGroupCode
             if industry_group_code == 0: continue
-            
+
             # Adding stocks in groups.
-            if not industry_group_code in group:
+            if industry_group_code not in group:
                 group[industry_group_code] = []
-            
+
             max_high = self.data[symbol].maximum()
             price = self.data[symbol].get_latest_price()
-            
+
             stock_prilag = (stock, price / max_high)
             group[industry_group_code].append(stock_prilag)
-        
+
         top_industries = []
         low_industries = []
-        
-        if len(group) != 0: 
+
+        if group: 
             # Weighted average of ratios calc.
             industry_prilag_weighted_avg = {}
             for industry_code in group:
-                total_market_cap = sum([stock_prilag_data[0].MarketCap for stock_prilag_data in group[industry_code]])
+                total_market_cap = sum(
+                    stock_prilag_data[0].MarketCap
+                    for stock_prilag_data in group[industry_code]
+                )
                 if total_market_cap == 0: continue
-                industry_prilag_weighted_avg[industry_code] = sum([stock_prilag_data[1] * (stock_prilag_data[0].MarketCap / total_market_cap) for stock_prilag_data in group[industry_code]])
-            
-            if len(industry_prilag_weighted_avg) != 0:
+                industry_prilag_weighted_avg[industry_code] = sum(
+                    stock_prilag_data[1]
+                    * (stock_prilag_data[0].MarketCap / total_market_cap)
+                    for stock_prilag_data in group[industry_code]
+                )
+
+            if industry_prilag_weighted_avg:
                 # Weighted average industry sorting.
                 sorted_by_weighted_avg = sorted(industry_prilag_weighted_avg.items(), key=lambda x: x[1], reverse = True)
                 top_industries = [x[0] for x in sorted_by_weighted_avg[:6]]
                 low_industries = [x[0] for x in sorted_by_weighted_avg[-6:]]
-        
+
         long = []
         short = []
         for industry_code in top_industries:
-            for stock_prilag_data in group[industry_code]:
-                symbol = stock_prilag_data[0].Symbol
-                long.append(symbol)
-        
+            long.extend(
+                stock_prilag_data[0].Symbol
+                for stock_prilag_data in group[industry_code]
+            )
         for industry_code in low_industries:
-            for stock_prilag_data in group[industry_code]:
-                symbol = stock_prilag_data[0].Symbol
-                short.append(symbol)
-                
+            short.extend(
+                stock_prilag_data[0].Symbol
+                for stock_prilag_data in group[industry_code]
+            )
         long_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(long)
         short_w = self.Portfolio.TotalPortfolioValue / self.holding_period / len(short)
-        
+
         # symbol/quantity collection
         long_symbol_q = [(x, floor(long_w / self.data[x].get_latest_price())) for x in long]
         short_symbol_q = [(x, -floor(short_w / self.data[x].get_latest_price())) for x in short]
-        
+
         self.managed_queue.append(RebalanceQueueItem(long_symbol_q + short_symbol_q))
-        
+
         return long + short
 
     def OnData(self, data):
@@ -192,10 +203,10 @@ class SymbolData():
         return self.Price.IsReady
      
     def maximum(self):
-        return max([x for x in self.Price])
+        return max(list(self.Price))
         
     def get_latest_price(self):
-        return [x for x in self.Price][0]
+        return list(self.Price)[0]
 
 # Custom fee model.
 class CustomFeeModel(FeeModel):

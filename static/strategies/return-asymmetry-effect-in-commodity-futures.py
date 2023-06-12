@@ -137,27 +137,25 @@ class SymbolData():
         return self.closes.IsReady
         
     def calculate_IE(self):
-        closes = np.array([x for x in self.closes])
+        closes = np.array(list(self.closes))
         daily_returns = (closes[:-1] - closes[1:]) / closes[1:]
-        
+
         average_daily_returns = np.average(daily_returns)
         two_daily_returns_std = 2 * np.std(daily_returns)
-        
+
         avg_plus_two_std = average_daily_returns + two_daily_returns_std
         avg_minus_two_std = average_daily_returns - two_daily_returns_std
-        
+
         over_avg_plus_two_std = 0 # counting number of daily returns, which were over avg_plus_two_std
         under_avg_minus_two_std = 0 # counting number of daily returns, which were under avg_minus_two_std
-        
+
         for daily_return in daily_returns:
             if daily_return > avg_plus_two_std:
                 over_avg_plus_two_std += 1
             elif daily_return < avg_minus_two_std:
                 under_avg_minus_two_std += 1
-                
-        IE_value = over_avg_plus_two_std - under_avg_minus_two_std
-        
-        return IE_value
+
+        return over_avg_plus_two_std - under_avg_minus_two_std
         
 # Quantpedia data.
 # NOTE: IMPORTANT: Data order must be ascending (datewise)

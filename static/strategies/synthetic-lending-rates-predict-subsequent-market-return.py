@@ -57,13 +57,13 @@ class QuantpediaLendingRates(PythonData):
     def Reader(self, config, line, date, isLiveMode):
         data:QuantpediaLendingRates = QuantpediaLendingRates()
         data.Symbol = config.Symbol
-        
+
         if not line[0].isdigit(): return None
 
         split:list = line.split(';')
 
-        datetime_str:str = split[0] + ', 15:59'
-        
+        datetime_str: str = f'{split[0]}, 15:59'
+
         data.Time = datetime.strptime(datetime_str, "%Y-%m-%d, %H:%M")
         valid_values:list = list(filter(lambda value: value != '', split[1:]))
         valid_values:list = list(map(lambda str_value: float(str_value), valid_values))

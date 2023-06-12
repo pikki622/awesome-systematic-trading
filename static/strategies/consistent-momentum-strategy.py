@@ -76,35 +76,40 @@ class ConsistentMomentumStrategy(QCAlgorithm):
         return [x for x in selected if self.data[x].is_ready()]
         
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and x.CompanyReference.IsREIT != 1 and  \
-                    ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                    
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.CompanyReference.IsREIT != 1
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x: x.MarketCap, reverse=True)
         #     top_by_market_cap = [x.Symbol for x in sorted_by_market_cap[:self.coarse_count]]
         # else:
         #     top_by_market_cap = [x.Symbol for x in fine]
         top_by_market_cap = [x.Symbol for x in fine]
-        
+
         momentum_t71_t60 = { x : (self.data[x].performance_t7t1(), self.data[x].performance_t6t0()) for x in top_by_market_cap}
-        
+
         # Momentum t-7 to t-1 sorting
         sorted_by_perf_t71 = sorted(momentum_t71_t60.items(), key = lambda x: x[1][0], reverse = True)
-        decile = int(len(sorted_by_perf_t71) / 10)
+        decile = len(sorted_by_perf_t71) // 10
         high_by_perf_t71 = [x[0] for x in sorted_by_perf_t71[:decile]]
         low_by_perf_t71 = [x[0] for x in sorted_by_perf_t71[-decile:]]
 
         # Momentum t-6 to t sorting
         sorted_by_perf_t60 = sorted(momentum_t71_t60.items(), key = lambda x: x[1][1], reverse = True)
-        decile = int(len(sorted_by_perf_t60) / 10)
+        decile = len(sorted_by_perf_t60) // 10
         high_by_perf_t60 = [x[0] for x in sorted_by_perf_t60[:decile]]
         low_by_perf_t60 = [x[0] for x in sorted_by_perf_t60[-decile:]]
-        
+
         self.long = [x for x in high_by_perf_t71 if x in high_by_perf_t60]
         self.short = [x for x in low_by_perf_t71 if x in low_by_perf_t60]
-        
+
         self.selection_flag = False
-        
+
         return self.long + self.short
         
     def Rebalance(self):
@@ -145,11 +150,11 @@ class SymbolData():
         return self.Price.IsReady
         
     def performance_t7t1(self):
-        closes = [x for x in self.Price][21:]
+        closes = list(self.Price)[21:]
         return (closes[0] / closes[-1] - 1)
 
     def performance_t6t0(self):
-        closes = [x for x in self.Price][:-21]
+        closes = list(self.Price)[:-21]
         return (closes[0] / closes[-1] - 1)
     
 # Custom fee model.

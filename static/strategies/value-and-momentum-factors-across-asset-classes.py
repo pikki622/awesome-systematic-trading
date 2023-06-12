@@ -102,11 +102,8 @@ class CountryPE(PythonData):
             "United Kingdom",
             "United States",
         ]
-        index = 1
-        for symbol in self.symbols:
+        for index, symbol in enumerate(self.symbols, start=1):
             data[symbol] = float(split[index])
-            index += 1
-
         data.Value = float(split[1])
         return data
 
@@ -369,17 +366,14 @@ class ValueandMomentumFactorsacrossAssetClasses(QCAlgorithm):
                     < 3
                 ):
                     if self.data[symbol].IsReady:
-                        closes = [x for x in self.data[symbol]]
+                        closes = list(self.data[symbol])
                         performance_1M[symbol] = closes[0] / closes[21] - 1
-                        performance_12M[symbol] = (
-                            closes[0] / closes[len(closes) - 1] - 1
-                        )
+                        performance_12M[symbol] = closes[0] / closes[-1] - 1
 
-                        if yield_access == None:
-                            country_pb_data = self.Securities[
+                        if yield_access is None:
+                            if country_pb_data := self.Securities[
                                 "CountryData"
-                            ].GetLastData()
-                            if country_pb_data:
+                            ].GetLastData():
                                 pe = country_pb_data[yield_symbol]
                                 yield_value = pe
                         else:
@@ -397,16 +391,13 @@ class ValueandMomentumFactorsacrossAssetClasses(QCAlgorithm):
         long = []
         short = []
 
-        if len(valuation) != 0:
+        if valuation:
             # sort assets by metrics
             sorted_by_p1 = sorted(performance_1M.items(), key=lambda x: x[1])
             sorted_by_p12 = sorted(performance_12M.items(), key=lambda x: x[1])
             sorted_by_value = sorted(valuation.items(), key=lambda x: x[1])
 
-            # rank assets
-            score = {}
-            for i, (symbol, _) in enumerate(sorted_by_p1):
-                score[symbol] = i * 0.25
+            score = {symbol: i * 0.25 for i, (symbol, _) in enumerate(sorted_by_p1)}
             for i, (symbol, _) in enumerate(sorted_by_p12):
                 score[symbol] += i * 0.25
             for i, (symbol, _) in enumerate(sorted_by_value):
@@ -414,7 +405,7 @@ class ValueandMomentumFactorsacrossAssetClasses(QCAlgorithm):
 
             # sort by rank
             sorted_by_rank = sorted(score, key=lambda x: score[x], reverse=True)
-            quartile = int(len(sorted_by_rank) / 4)
+            quartile = len(sorted_by_rank) // 4
             long = sorted_by_rank[:quartile]
             short = sorted_by_rank[-quartile:]
 

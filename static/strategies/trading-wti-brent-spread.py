@@ -29,23 +29,23 @@ class WTIBRENTSpread(QCAlgorithm):
     def OnData(self, data):
         symbol1 = self.Symbol(self.symbols[0])
         symbol2 = self.Symbol(self.symbols[1])
-        
+
         if symbol1 in data.Keys and symbol2 in data.Keys and data[symbol1] and data[symbol2]:
             price1 = data[symbol1].Price
             price2 = data[symbol2].Price
-            
+
             if price1 != 0 and price2 != 0:
                 spread = price1 - price2
                 self.spread.Add(spread)
-        
+
         # MA calculation.
         if self.spread.IsReady:
             if (self.Time.date() - self.Securities[symbol1].GetLastData().Time.date()).days < 5 and (self.Time.date() - self.Securities[symbol2].GetLastData().Time.date()).days < 5:
-                spreads = [x for x in self.spread]
+                spreads = list(self.spread)
                 spread_ma20 = sum(spreads) / len(spreads)
-                
+
                 current_spread = spreads[0]
-                
+
                 if current_spread > spread_ma20:
                     self.SetHoldings(symbol1, -1)
                     self.SetHoldings(symbol2, 1)

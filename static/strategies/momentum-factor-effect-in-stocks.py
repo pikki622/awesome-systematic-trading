@@ -67,9 +67,13 @@ class MomentumFactorEffectinStocks(QCAlgorithm):
         return [x for x in selected if self.data[x].IsReady]
     
     def FineSelectionFunction(self, fine):
-        fine = [x for x in fine if x.MarketCap != 0 and \
-                    ((x.SecurityReference.ExchangeId == "NYS") or (x.SecurityReference.ExchangeId == "NAS") or (x.SecurityReference.ExchangeId == "ASE"))]
-                    
+        fine = [
+            x
+            for x in fine
+            if x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
+        ]
+
         # if len(fine) > self.coarse_count:
         #     sorted_by_market_cap = sorted(fine, key = lambda x:x.MarketCap, reverse=True)
         #     top_by_market_cap = [x for x in sorted_by_market_cap[:self.coarse_count]]
@@ -91,7 +95,7 @@ class MomentumFactorEffectinStocks(QCAlgorithm):
                 self.weight[symbol] = 1 / long_count
             for symbol in short:
                 self.weight[symbol] = -1 / short_count
-        
+
         return list(self.weight.keys())
         
     def OnData(self, data):

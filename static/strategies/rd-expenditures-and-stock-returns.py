@@ -51,23 +51,15 @@ class RDExpendituresandStockReturns(QCAlgorithm):
         if not self.selection_flag:
             return Universe.Unchanged
 
-        selected = [x.Symbol for x in coarse if x.HasFundamentalData and x.Price > 5]
-
-        return selected
+        return [x.Symbol for x in coarse if x.HasFundamentalData and x.Price > 5]
 
     def FineSelectionFunction(self, fine):
         fine = [
             x
             for x in fine
-            if (
-                x.FinancialStatements.IncomeStatement.ResearchAndDevelopment.TwelveMonths
-            )
-            and (x.MarketCap != 0)
-            and (
-                (x.SecurityReference.ExchangeId == "NYS")
-                or (x.SecurityReference.ExchangeId == "NAS")
-                or (x.SecurityReference.ExchangeId == "ASE")
-            )
+            if x.FinancialStatements.IncomeStatement.ResearchAndDevelopment.TwelveMonths
+            and x.MarketCap != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
         ]
         # and x.AssetClassification.MorningstarSectorCode == MorningstarSectorCode.Technology]
 
@@ -97,7 +89,7 @@ class RDExpendituresandStockReturns(QCAlgorithm):
 
                 if self.RD[symbol].IsReady:
                     coefs = np.array([1, 0.8, 0.6, 0.4, 0.2])
-                    rds = np.array([x for x in self.RD[symbol]])
+                    rds = np.array(list(self.RD[symbol]))
 
                     rdc = sum(coefs * rds)
                     ability[stock] = rdc / stock.MarketCap
@@ -111,33 +103,26 @@ class RDExpendituresandStockReturns(QCAlgorithm):
             if fine_symbols.count(symbol) > 1:
                 updated_flag.append(symbol)
 
-        # Ability market cap weighting.
-        # total_market_cap = sum([x.MarketCap for x in ability])
-        # for stock, rdc in ability.items():
-        # ability[stock] = rdc * (stock.MarketCap / total_market_cap)
-
-        # Remove not updated symbols
-        symbols_to_delete = []
-        for symbol in self.RD.keys():
-            if symbol not in fine_symbols:
-                symbols_to_delete.append(symbol)
+        symbols_to_delete = [
+            symbol for symbol in self.RD.keys() if symbol not in fine_symbols
+        ]
         for symbol in symbols_to_delete:
             if symbol in self.RD:
                 del self.RD[symbol]
 
         # starts trading after data storing period
-        if len(ability) != 0:
+        if ability:
             # Ability sorting.
             sorted_by_ability = sorted(
                 ability.items(), key=lambda x: x[1], reverse=True
             )
-            decile = int(len(sorted_by_ability) / 5)
+            decile = len(sorted_by_ability) // 5
             high_by_ability = [x[0].Symbol for x in sorted_by_ability[:decile]]
             low_by_ability = [x[0].Symbol for x in sorted_by_ability[-decile:]]
 
             self.long = high_by_ability
             self.short = low_by_ability
-            # self.short = [self.technology_sector]
+                # self.short = [self.technology_sector]
 
         return self.long + self.short
 

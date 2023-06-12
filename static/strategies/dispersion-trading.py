@@ -61,25 +61,25 @@ class DispersionTrading(QCAlgorithm):
             self.subscribed_contracts.clear()   # perform new subscribtion
             self.selected_symbols.clear()       # perform new selection
             self.Liquidate()
-            
+
         if len(self.subscribed_contracts) == 0:
             if self.Portfolio.Invested:
                 self.Liquidate()
-            
+
             # NOTE order is important, index should come first
             for symbol in [self.index_symbol] + self.selected_symbols:
                 # subscribe to contract
                 contracts = self.OptionChainProvider.GetOptionContractList(symbol, self.Time)
                 # get current price for stock
                 underlying_price = self.Securities[symbol].Price
-                
+
                 # get strikes from stock contracts
                 strikes = [i.ID.StrikePrice for i in contracts]
-                
+
                 # check if there is at least one strike    
                 if len(strikes) <= 0:
                     continue
-            
+
                 # at the money
                 atm_strike = min(strikes, key=lambda x: abs(x-underlying_price))
 
@@ -89,15 +89,15 @@ class DispersionTrading(QCAlgorithm):
                                                      self.min_expiry <= (i.ID.Date - self.Time).days <= self.max_expiry]
 
                 # index contract is found
-                if symbol == self.index_symbol and len(atm_puts) == 0:
+                if symbol == self.index_symbol and not atm_puts:
                     # cancel whole selection since index contract was not found
                     return
-                    
+
                 # make sure there are enough contracts
-                if len(atm_puts) > 0:
+                if atm_puts:
                     # sort by expiry
                     atm_put = sorted(atm_puts, key = lambda item: item.ID.Date, reverse=True)[0]
-                    
+
                     # add contract
                     option = self.AddOptionContract(atm_put, Resolution.Minute)
                     option.PriceModel = OptionPriceModels.CrankNicolsonFD()
@@ -105,7 +105,7 @@ class DispersionTrading(QCAlgorithm):
 
                     # store subscribed atm put contract
                     self.subscribed_contracts[symbol] = atm_put
-        
+
         # perform trade, when spx and stocks contracts are selected            
         if not self.Portfolio.Invested and len(self.subscribed_contracts) != 0 and self.index_symbol in self.subscribed_contracts:
             index_option_contract = self.subscribed_contracts[self.index_symbol]
@@ -124,7 +124,7 @@ class DispersionTrading(QCAlgorithm):
                     for stock_symbol, stock_option_contract in self.subscribed_contracts.items():
                         if stock_symbol == self.index_symbol:
                             continue
-                        
+
                         if self.Securities[stock_option_contract].Price != 0 and self.Securities[stock_option_contract].IsTradable:
                             # buy contract
                             self.Securities[stock_option_contract].MarginModel = BuyingPowerModel(2)

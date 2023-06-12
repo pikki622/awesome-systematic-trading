@@ -20,8 +20,7 @@ def Volatility(values):
 def MultipleLinearRegression(x, y):
     x = np.array(x).T
     x = sm.add_constant(x)
-    result = sm.OLS(endog=y, exog=x).fit()
-    return result
+    return sm.OLS(endog=y, exog=x).fit()
     
 # Custom fee model.
 class CustomFeeModel(FeeModel):
@@ -191,25 +190,18 @@ class TradeManager():
     def Add(self, symbol, long_flag):
         # Open new long trade.
         managed_symbol = ManagedSymbol(symbol, self.holding_period, long_flag)
-        
-        if long_flag:
-            # If there's a place for it.
-            if self.long_len < self.long_size:
-                self.symbols.append(managed_symbol)
-                self.algorithm.SetHoldings(symbol, 1 / self.long_size)
-                self.long_len += 1
-            else:
-                self.algorithm.Log("There's not place for additional trade.")
 
-        # Open new short trade.
+        if long_flag and self.long_len < self.long_size:
+            self.symbols.append(managed_symbol)
+            self.algorithm.SetHoldings(symbol, 1 / self.long_size)
+            self.long_len += 1
+        elif long_flag or self.short_len >= self.short_size:
+            self.algorithm.Log("There's not place for additional trade.")
+
         else:
-            # If there's a place for it.
-            if self.short_len < self.short_size:
-                self.symbols.append(managed_symbol)
-                self.algorithm.SetHoldings(symbol, - 1 / self.short_size)
-                self.short_len += 1
-            else:
-                self.algorithm.Log("There's not place for additional trade.")
+            self.symbols.append(managed_symbol)
+            self.algorithm.SetHoldings(symbol, - 1 / self.short_size)
+            self.short_len += 1
    
     # Decrement holding period and liquidate symbols.
     def TryLiquidate(self):
@@ -235,11 +227,11 @@ class TradeManager():
             if managed_symbol.symbol.Value == ticker:
                 self.algorithm.Liquidate(managed_symbol.symbol)
                 symbol_to_delete = managed_symbol
-                if managed_symbol.long_flag: self.long_len -= 1
+                if symbol_to_delete.long_flag: self.long_len -= 1
                 else: self.short_len -= 1
-                
+
                 break
-        
+
         if symbol_to_delete: self.symbols.remove(symbol_to_delete)
         else: self.algorithm.Debug("Ticker is not held in portfolio!")
     
@@ -274,16 +266,16 @@ class PortfolioOptimization(object):
     def opt_portfolio(self):
         # maximize the sharpe ratio to find the optimal weights
         cons = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
-        bnds = tuple((0, 1) for x in range(2)) + tuple((0, 0.25) for x in range(self.n - 2))
+        bnds = tuple((0, 1) for _ in range(2)) + tuple(
+            (0, 0.25) for _ in range(self.n - 2)
+        )
         opt = minimize(self.min_func,                               # object function
                        np.array(self.n * [1. / self.n]),            # initial value
                        method='SLSQP',                              # optimization method
                        bounds=bnds,                                 # bounds for variables 
                        constraints=cons)                            # constraint conditions
-                      
-        opt_weights = opt['x']
- 
-        return opt_weights
+
+        return opt['x']
 
 
 # https://quantpedia.com/strategies/crude-oil-predicts-equity-returns/
@@ -332,43 +324,43 @@ class CrudeOilPredictsEquityReturns(QCAlgorithm):
 
     def OnData(self, data):
         rebalance_flag = False
-        
+
         for symbol in self.symbols:
             if symbol in data:
                 if self.recent_month != self.Time.month:
                     rebalance_flag = True
-                    
+
                 if data[symbol]:
                     price = data[symbol].Value
                     self.data[symbol].append(price)
 
         if rebalance_flag:
             self.recent_month = self.Time.month
-        
+
         rf_rate = 0
         if self.Securities[self.risk_free_rate].GetLastData() and (self.Time.date() - self.Securities[self.risk_free_rate].GetLastData().Time.date()).days < 5:
             rf_rate = self.Securities[self.risk_free_rate].Price
         else:
             return
-            
+
         if self.Securities[self.cash].GetLastData() and (self.Time.date() - self.Securities[self.cash].GetLastData().Time.date()).days >= 5:
             return
-            
+
         market_prices = np.array(self.data[self.symbols[0]])
         oil_prices = np.array(self.data[self.symbols[1]])
-        
+
         # At least one year of data is ready.
         if len(market_prices) < 13 or len(oil_prices) < 13:
             return
-        
+
         # Trim price series lenghts.
         min_size = min(len(market_prices), len(oil_prices))
         market_prices = market_prices[-min_size:]
         oil_prices = oil_prices[-min_size:]
-        
+
         market_returns = (market_prices[1:] - market_prices[:-1]) / market_prices[:-1]
         oil_returns = (oil_prices[1:] - oil_prices[:-1]) / oil_prices[:-1]
-        
+
         # Simple Linear Regression
         # Y = C + (M * X)
         # Y = α + (β ∗ X)
@@ -381,9 +373,8 @@ class CrudeOilPredictsEquityReturns(QCAlgorithm):
         slope, intercept, r_value, p_value, std_err = stats.linregress(oil_returns[:-1], market_returns[1:])
         X = oil_returns[-1]
         expected_market_return = intercept + (slope * X)
-        
+
         if expected_market_return > rf_rate:
             self.SetHoldings(self.symbols[0], 1)
-        else:
-            if self.Securities[self.cash].Price != 0:
-                self.SetHoldings(self.cash, 1)
+        elif self.Securities[self.cash].Price != 0:
+            self.SetHoldings(self.cash, 1)

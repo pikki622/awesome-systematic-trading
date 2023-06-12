@@ -63,32 +63,28 @@ class ROAEffectWithinStocks(QCAlgorithm):
             * x.EarningReports.DilutedAverageShares.Value
             > 10000000
             and x.OperationRatios.ROA.ThreeMonths != 0
-            and (
-                (x.SecurityReference.ExchangeId == "NYS")
-                or (x.SecurityReference.ExchangeId == "NAS")
-                or (x.SecurityReference.ExchangeId == "ASE")
-            )
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
         ]
 
         # Sorting by market cap.
         sorted_by_market_cap = sorted(fine, key=lambda x: x.MarketCap, reverse=True)
-        half = int(len(sorted_by_market_cap) / 2)
-        top_mc = [x for x in sorted_by_market_cap[:half]]
-        bottom_mc = [x for x in sorted_by_market_cap[half:]]
+        half = len(sorted_by_market_cap) // 2
+        top_mc = list(sorted_by_market_cap[:half])
+        bottom_mc = list(sorted_by_market_cap[half:])
 
         if len(top_mc) >= 10 and len(bottom_mc) >= 10:
             # Sorting by ROA.
             sorted_top_by_roa = sorted(
                 top_mc, key=lambda x: (x.OperationRatios.ROA.Value), reverse=True
             )
-            decile = int(len(sorted_top_by_roa) / 10)
+            decile = len(sorted_top_by_roa) // 10
             long_top = [x.Symbol for x in sorted_top_by_roa[: decile * 3]]
             short_top = [x.Symbol for x in sorted_top_by_roa[-(decile * 3) :]]
 
             sorted_bottom_by_roa = sorted(
                 bottom_mc, key=lambda x: (x.OperationRatios.ROA.Value), reverse=True
             )
-            decile = int(len(sorted_bottom_by_roa) / 10)
+            decile = len(sorted_bottom_by_roa) // 10
             long_bottom = [x.Symbol for x in sorted_bottom_by_roa[: decile * 3]]
             short_bottom = [x.Symbol for x in sorted_bottom_by_roa[-(decile * 3) :]]
 

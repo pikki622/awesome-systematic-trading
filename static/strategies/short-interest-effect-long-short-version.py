@@ -120,9 +120,7 @@ class ShortInterestEffect(QCAlgorithm):
             data.SetFeeModel(CustomFeeModel())
             data.SetLeverage(5)
 
-            self.AddData(
-                QuandlFINRA_ShortVolume, "FINRA/FNSQ_" + symbol, Resolution.Daily
-            )
+            self.AddData(QuandlFINRA_ShortVolume, f"FINRA/FNSQ_{symbol}", Resolution.Daily)
 
         self.recent_month = -1
 
@@ -133,7 +131,7 @@ class ShortInterestEffect(QCAlgorithm):
 
         short_interest = {}
         for symbol in self.symbols:
-            sym = "FINRA/FNSQ_" + symbol
+            sym = f"FINRA/FNSQ_{symbol}"
             if sym in data and data[sym] and symbol in data and data[symbol]:
                 short_vol = data[sym].GetProperty("SHORTVOLUME")
                 total_vol = data[sym].GetProperty("TOTALVOLUME")
@@ -146,7 +144,7 @@ class ShortInterestEffect(QCAlgorithm):
             sorted_by_short_interest = sorted(
                 short_interest.items(), key=lambda x: x[1], reverse=True
             )
-            decile = int(len(sorted_by_short_interest) / 10)
+            decile = len(sorted_by_short_interest) // 10
             long = [x[0] for x in sorted_by_short_interest[-decile:]]
             short = [x[0] for x in sorted_by_short_interest[:decile]]
 

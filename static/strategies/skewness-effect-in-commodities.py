@@ -90,7 +90,7 @@ class SkewnessEffect(QCAlgorithm):
                     ).days
                     < 5
                 ):
-                    prices = np.array([x for x in self.data[symbol]])
+                    prices = np.array(list(self.data[symbol]))
                     returns = (prices[:-1] / prices[1:]) - 1
                     if len(returns) == self.period - 1:
                         # NOTE: Manual skewness calculation example

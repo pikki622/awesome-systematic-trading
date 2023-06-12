@@ -155,39 +155,29 @@ class CombiningFSCOREShortTermReversals(QCAlgorithm):
         fine = [
             x
             for x in fine
-            if (x.EarningReports.BasicAverageShares.ThreeMonths != 0)
-            and (x.EarningReports.BasicEPS.TwelveMonths != 0)
-            and (x.ValuationRatios.PERatio != 0)
-            and (x.OperationRatios.ROA.ThreeMonths != 0)
-            and (
-                x.FinancialStatements.CashFlowStatement.CashFlowFromContinuingOperatingActivities.ThreeMonths
-                != 0
-            )
-            and (
-                x.FinancialStatements.IncomeStatement.NormalizedIncome.ThreeMonths != 0
-            )
-            and (x.FinancialStatements.BalanceSheet.LongTermDebt.ThreeMonths != 0)
-            and (x.FinancialStatements.BalanceSheet.TotalAssets.ThreeMonths != 0)
-            and (x.OperationRatios.CurrentRatio.ThreeMonths != 0)
-            and (
-                x.FinancialStatements.BalanceSheet.OrdinarySharesNumber.ThreeMonths != 0
-            )
-            and (x.OperationRatios.GrossMargin.ThreeMonths != 0)
-            and (
-                x.FinancialStatements.IncomeStatement.TotalRevenueAsReported.ThreeMonths
-                != 0
-            )
-            and (
-                (x.SecurityReference.ExchangeId == "NYS")
-                or (x.SecurityReference.ExchangeId == "NAS")
-                or (x.SecurityReference.ExchangeId == "ASE")
-            )
+            if x.EarningReports.BasicAverageShares.ThreeMonths != 0
+            and x.EarningReports.BasicEPS.TwelveMonths != 0
+            and x.ValuationRatios.PERatio != 0
+            and x.OperationRatios.ROA.ThreeMonths != 0
+            and x.FinancialStatements.CashFlowStatement.CashFlowFromContinuingOperatingActivities.ThreeMonths
+            != 0
+            and x.FinancialStatements.IncomeStatement.NormalizedIncome.ThreeMonths
+            != 0
+            and x.FinancialStatements.BalanceSheet.LongTermDebt.ThreeMonths != 0
+            and x.FinancialStatements.BalanceSheet.TotalAssets.ThreeMonths != 0
+            and x.OperationRatios.CurrentRatio.ThreeMonths != 0
+            and x.FinancialStatements.BalanceSheet.OrdinarySharesNumber.ThreeMonths
+            != 0
+            and x.OperationRatios.GrossMargin.ThreeMonths != 0
+            and x.FinancialStatements.IncomeStatement.TotalRevenueAsReported.ThreeMonths
+            != 0
+            and x.SecurityReference.ExchangeId in ["NYS", "NAS", "ASE"]
         ]
 
         # BM sorting
         sorted_by_market_cap = sorted(fine, key=lambda x: x.MarketCap, reverse=True)
         lenght = int((len(sorted_by_market_cap) / 100) * 40)
-        top_by_market_cap = [x for x in sorted_by_market_cap[:lenght]]
+        top_by_market_cap = list(sorted_by_market_cap[:lenght])
 
         fine_symbols = [x.Symbol for x in top_by_market_cap]
 
@@ -331,7 +321,7 @@ class SymbolData:
         return self.Price.IsReady
 
     def performance(self, values_to_skip=0) -> float:
-        closes = [x for x in self.Price][values_to_skip:]
+        closes = list(self.Price)[values_to_skip:]
         return closes[0] / closes[-1] - 1
 
 

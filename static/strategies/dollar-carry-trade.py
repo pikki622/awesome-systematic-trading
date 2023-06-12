@@ -26,13 +26,11 @@ class DollarCarryTrade(QCAlgorithm):
             "CME_SF1": "SNB/ZIMOMA",  # Swiss Franc Futures, Continuous Contract #1
         }
 
-        for symbol in self.symbols:
+        for symbol, cash_rate_symbol in self.symbols.items():
             data = self.AddData(QuantpediaFutures, symbol, Resolution.Daily)
             data.SetFeeModel(CustomFeeModel())
             data.SetLeverage(5)
 
-            # Interbank rate data.
-            cash_rate_symbol = self.symbols[symbol]
             self.AddData(QuandlValue, cash_rate_symbol, Resolution.Daily)
 
         self.treasury_rate = self.AddData(
@@ -55,7 +53,7 @@ class DollarCarryTrade(QCAlgorithm):
                     # Update cash rate only once a month.
                     fd[future_symbol] = cash_rate
 
-        if len(fd) == 0:
+        if not fd:
             return
 
         afd = np.mean([x[1] for x in fd.items()])

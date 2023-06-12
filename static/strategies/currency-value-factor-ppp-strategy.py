@@ -75,13 +75,11 @@ class CurrencyValueFactorPPPStrategy(QCAlgorithm):
             "CME_SF1": "ODA/CHE_PPPEX",  # Swiss Franc Futures, Continuous Contract #1
         }
 
-        for symbol in self.symbols:
+        for symbol, ppp_symbol in self.symbols.items():
             data = self.AddData(data_tools.QuantpediaFutures, symbol, Resolution.Daily)
             data.SetFeeModel(data_tools.CustomFeeModel())
             data.SetLeverage(5)
 
-            # PPP quandl data.
-            ppp_symbol = self.symbols[symbol]
             self.AddData(data_tools.QuandlValue, ppp_symbol, Resolution.Daily)
 
         self.recent_month = -1
